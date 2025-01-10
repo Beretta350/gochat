@@ -67,7 +67,7 @@ func Init(environment string) {
 		}
 
 		// Build logger
-		logger, err := zapConfig.Build()
+		logger, err := zapConfig.Build(zap.AddCallerSkip(1))
 		if err != nil {
 			log.Fatalf("Failed to initialize logger: %v", err)
 		}

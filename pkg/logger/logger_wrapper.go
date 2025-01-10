@@ -2,6 +2,16 @@ package logger
 
 import "go.uber.org/zap"
 
+//func SetupLogger(fileName string) *zap.SugaredLogger {
+//	// Get the default logger instance (configured with zap.S())
+//	logger := zap.S()
+//
+//	// Add the custom filename as part of the fields for every log entry
+//	logger = logger.With("filename", fileName)
+//
+//	return logger
+//}
+
 // Debug logs a debug message.
 func Debug(args ...interface{}) {
 	zap.S().Debug(args...)
