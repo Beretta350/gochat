@@ -63,6 +63,28 @@ func (h *websocketHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 	listenIncomingMessages(ws)
 }
 
+func (h *websocketHandler) handleHandshake(r *http.Request, ws *websocket.Conn) (string, error) {
+	usersCache := cache.GetConnectedUserCache()
+
+	// Extract the token from the query parameters
+	queryParams := r.URL.Query()
+	userToken := queryParams.Get("token")
+	if userToken == "" {
+		return "", fmt.Errorf("missing user token in WebSocket URL")
+	}
+
+	logger.Info("Initial handshake received for:", userToken)
+
+	// Check if the userToken is already connected
+	if conn := usersCache.Get(userToken); conn != nil {
+		return "", fmt.Errorf("user %s is already connected", userToken)
+	}
+
+	// Add the user to the cache (thread-safe)
+	usersCache.Add(userToken, ws)
+	return userToken, nil
+}
+
 func (h *websocketHandler) HandleChatMessages() {
 	userCache := cache.GetConnectedUserCache()
 
@@ -105,26 +127,4 @@ func listenIncomingMessages(ws *websocket.Conn) {
 		//TODO: Should Forward message to kafka
 		broadcast <- msg
 	}
-}
-
-func (h *websocketHandler) handleHandshake(r *http.Request, ws *websocket.Conn) (string, error) {
-	usersCache := cache.GetConnectedUserCache()
-
-	// Extract the token from the query parameters
-	queryParams := r.URL.Query()
-	userToken := queryParams.Get("token")
-	if userToken == "" {
-		return "", fmt.Errorf("missing user token in WebSocket URL")
-	}
-
-	logger.Info("Initial handshake received for:", userToken)
-
-	// Check if the userToken is already connected
-	if conn := usersCache.Get(userToken); conn != nil {
-		return "", fmt.Errorf("user %s is already connected", userToken)
-	}
-
-	// Add the user to the cache (thread-safe)
-	usersCache.Add(userToken, ws)
-	return userToken, nil
 }
