@@ -10,7 +10,7 @@ var once sync.Once
 var instance *connectedUserCache
 
 type WebsocketConnectionCache interface {
-	Get(username string) (*websocket.Conn, bool)
+	Get(username string) *websocket.Conn
 	Add(username string, conn *websocket.Conn)
 	Remove(username string)
 }
@@ -27,9 +27,12 @@ func GetConnectedUserCache() WebsocketConnectionCache {
 	return instance
 }
 
-func (c *connectedUserCache) Get(username string) (*websocket.Conn, bool) {
+func (c *connectedUserCache) Get(username string) *websocket.Conn {
 	conn, ok := c.connectedUsers.Load(username)
-	return conn.(*websocket.Conn), ok
+	if ok {
+		return conn.(*websocket.Conn)
+	}
+	return nil
 }
 
 // Add adds a WebSocket connection to the cache.

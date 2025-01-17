@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"github.com/Beretta350/gochat/internal/app/cache"
 	"github.com/Beretta350/gochat/pkg/logger"
+	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"sync"
-	"time"
-
-	"github.com/gorilla/websocket"
 
 	"github.com/Beretta350/gochat/internal/app/model"
 )
@@ -53,14 +51,14 @@ func (h *websocketHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 	//TODO: Develop a retry method for closing connection
 	defer func() { _ = ws.Close() }()
 
-	username, err := h.handleHandshakeMessage(ws)
+	userToken, err := h.handleHandshake(r, ws)
 	if err != nil {
 		logger.Info(err)
 		return
 	}
 
 	//The cache use sync.Map that means already has mutex
-	defer usersCache.Remove(username)
+	defer usersCache.Remove(userToken)
 
 	listenIncomingMessages(ws)
 }
@@ -75,10 +73,10 @@ func (h *websocketHandler) HandleChatMessages() {
 
 		// Find the recipient's WebSocket connection
 		mutex.Lock()
-		recipientConn, ok := userCache.Get(msg.Recipient)
+		recipientConn := userCache.Get(msg.Recipient)
 		mutex.Unlock()
 
-		if ok {
+		if recipientConn != nil {
 			// Send message to the recipient
 			err := recipientConn.WriteJSON(msg)
 			if err != nil {
@@ -109,20 +107,24 @@ func listenIncomingMessages(ws *websocket.Conn) {
 	}
 }
 
-func (h *websocketHandler) handleHandshakeMessage(ws *websocket.Conn) (string, error) {
+func (h *websocketHandler) handleHandshake(r *http.Request, ws *websocket.Conn) (string, error) {
 	usersCache := cache.GetConnectedUserCache()
 
-	// Register client connection
-	var handshakeMsg model.HandshakeMessage
-	err := ws.ReadJSON(&handshakeMsg)
-	if err != nil {
-		return "", fmt.Errorf("error during initial handshake: %v", err)
+	// Extract the token from the query parameters
+	queryParams := r.URL.Query()
+	userToken := queryParams.Get("token")
+	if userToken == "" {
+		return "", fmt.Errorf("missing user token in WebSocket URL")
 	}
 
-	handshakeMsg.Created = time.Now()
-	logger.Info("initial handshake received:", handshakeMsg)
+	logger.Info("Initial handshake received for:", userToken)
 
-	//The cache use sync.Map that means already has mutex
-	usersCache.Add(handshakeMsg.Username, ws)
-	return handshakeMsg.Username, nil
+	// Check if the userToken is already connected
+	if conn := usersCache.Get(userToken); conn != nil {
+		return "", fmt.Errorf("user %s is already connected", userToken)
+	}
+
+	// Add the user to the cache (thread-safe)
+	usersCache.Add(userToken, ws)
+	return userToken, nil
 }
