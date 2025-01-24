@@ -19,9 +19,6 @@ func Run() {
 	// Configure WebSocket route
 	http.HandleFunc("/ws", websocketHandler.HandleConnection)
 
-	// Start handling messages
-	go websocketHandler.HandleChatMessages()
-
 	// Start the server
 	logger.Infof("Http server started on port %v", serverConfig.Port)
 	err := http.ListenAndServe(":"+serverConfig.Port, nil)

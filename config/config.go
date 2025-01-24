@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/Beretta350/gochat/pkg/kafka_wrapper"
 	"github.com/Beretta350/gochat/pkg/logger"
 	"github.com/Beretta350/gochat/pkg/util"
 	"github.com/joho/godotenv"
@@ -23,8 +24,15 @@ func init() {
 		}
 	}
 
+	kafkaBrokers := util.GetEnv("KAFKA_BROKER", "kafka:9092")
+
+	// Setup logger before all
 	logger.Init(env)
-	setup()
+
+	// Setup kafka admin client and wrapper
+	kafka_wrapper.Init(kafkaBrokers)
+
+	setupApplication()
 
 	logger.Info("Configuration successfully setup!")
 }
@@ -41,11 +49,12 @@ type ServerConfig struct {
 	Port string
 }
 
-func setup() *Config {
+func setupApplication() *Config {
 	once.Do(func() {
 		serverConfig := &ServerConfig{
 			Port: util.GetEnv("SERVER_PORT", "8080"),
 		}
+
 		instance = &Config{Server: serverConfig}
 	})
 	return instance

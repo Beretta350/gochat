@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -24,4 +25,8 @@ func (m ChatMessage) String() string {
 		"{sender: %s, content: %s, recipient: %s, created: %s}",
 		m.Sender, m.Content, m.Recipient, m.Created.String(),
 	)
+}
+
+func (m ChatMessage) Bytes() ([]byte, error) {
+	return json.Marshal(m)
 }
