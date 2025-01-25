@@ -13,7 +13,8 @@ import (
 type KafkaClient interface {
 	ProduceMessage(message model.ChatMessage) error
 	ConsumeMessage(ctx context.Context, handler func(model.ChatMessage)) error
-	CloseConnection()
+	CloseProducer()
+	CloseConsumer()
 }
 
 type kafkaClient struct {
@@ -123,11 +124,15 @@ func (u *kafkaClient) ConsumeMessage(ctx context.Context, handler func(model.Cha
 	}
 }
 
-// CloseConnection cleans up Kafka resources.
-func (u *kafkaClient) CloseConnection() {
+func (u *kafkaClient) CloseProducer() {
 	u.producer.Close()
+	logger.Info("Kafka producer closed")
+}
+
+func (u *kafkaClient) CloseConsumer() {
 	err := u.consumer.Close()
 	if err != nil {
-		panic(err)
+		logger.Fatal("Error closing consumer:", err)
 	}
+	logger.Info("Kafka consumer closed")
 }

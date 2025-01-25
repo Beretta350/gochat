@@ -15,7 +15,8 @@ import (
 var mutex = &sync.Mutex{}
 
 type WebsocketService interface {
-	HandleWebsocketSession(ctx context.Context, ws *websocket.Conn, userToken string) error
+	HandleSession(ctx context.Context, ws *websocket.Conn, client messaging.KafkaClient)
+	SetupSession(ctx context.Context, ws *websocket.Conn, userToken string) (messaging.KafkaClient, error)
 }
 
 type websocketService struct{}
@@ -24,28 +25,14 @@ func NewWebsocketService() WebsocketService {
 	return &websocketService{}
 }
 
-func (s *websocketService) HandleWebsocketSession(ctx context.Context, ws *websocket.Conn, userToken string) error {
-	usersCache := cache.GetConnectedUserCache()
-	logger.Info("Initial handshake received for: ", userToken)
-
-	kafkaClient, err := s.authenticateAndInitializeSession(ctx, ws, userToken)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		kafkaClient.CloseConnection()
-		usersCache.Remove(userToken)
-	}()
-
-	go s.startChatMessagesHandler(ctx, kafkaClient)
-	s.startIncomingMessagesHandler(ws, kafkaClient)
-
-	return nil
+func (s *websocketService) HandleSession(ctx context.Context, ws *websocket.Conn, client messaging.KafkaClient) {
+	go s.startChatMessagesHandler(ctx, client)
+	s.startIncomingMessagesHandler(ws, client)
 }
 
-func (s *websocketService) authenticateAndInitializeSession(ctx context.Context, ws *websocket.Conn, userToken string) (messaging.KafkaClient, error) {
+func (s *websocketService) SetupSession(ctx context.Context, ws *websocket.Conn, userToken string) (messaging.KafkaClient, error) {
 	usersCache := cache.GetConnectedUserCache()
+	logger.Info("Initial handshake received for: ", userToken)
 
 	// Check if the userToken is already connected
 	if conn := usersCache.Get(userToken); conn != nil {
@@ -63,6 +50,7 @@ func (s *websocketService) authenticateAndInitializeSession(ctx context.Context,
 }
 
 func (s *websocketService) startChatMessagesHandler(ctx context.Context, client messaging.KafkaClient) {
+	defer client.CloseConsumer()
 	err := client.ConsumeMessage(ctx, handleChatMessages)
 	if err != nil {
 		logger.Error("Error in Kafka consumer:", err)
@@ -70,11 +58,16 @@ func (s *websocketService) startChatMessagesHandler(ctx context.Context, client 
 }
 
 func (s *websocketService) startIncomingMessagesHandler(ws *websocket.Conn, client messaging.KafkaClient) {
+	defer client.CloseProducer()
 	for {
 		var msg model.ChatMessage
 		err := ws.ReadJSON(&msg)
 		if err != nil {
-			logger.Infof("Error decoding websocket message: %v", err)
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				logger.Info("Disconnect message received")
+			} else {
+				logger.Errorf("Error decoding websocket message: %v", err)
+			}
 			break
 		}
 

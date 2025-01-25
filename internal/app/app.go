@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/Beretta350/gochat/config"
+	"github.com/Beretta350/gochat/internal/app/service"
 	"github.com/Beretta350/gochat/pkg/logger"
 	"net/http"
 
@@ -10,11 +11,9 @@ import (
 
 func Run() {
 	serverConfig := config.GetServerConfig()
-	websocketHandler := handler.NewWebsocketHandler()
 
-	// Serve static files
-	fs := http.FileServer(http.Dir("public"))
-	http.Handle("/", fs)
+	websocketService := service.NewWebsocketService()
+	websocketHandler := handler.NewWebsocketHandler(websocketService)
 
 	// Configure WebSocket route
 	http.HandleFunc("/ws", websocketHandler.HandleConnection)
