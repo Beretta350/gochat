@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"github.com/Beretta350/gochat/internal/app/cache"
 	"github.com/Beretta350/gochat/internal/app/service"
 	"github.com/Beretta350/gochat/pkg/logger"
@@ -30,8 +29,7 @@ func NewWebsocketHandler(s service.WebsocketService) WebsocketHandler {
 }
 
 func (h *websocketHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(r.Context())
-	usersCache := cache.GetConnectedUserCache()
+	ctx := r.Context()
 
 	// Upgrade initial GET request to a WebSocket
 	logger.Info("Connecting from: ", r.RemoteAddr)
@@ -45,17 +43,17 @@ func (h *websocketHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		logger.Fatal("Missing user token")
 	}
 
-	//TODO: Develop a retry method for closing connection
-	defer func() {
-		cancel()
-		_ = ws.Close()
-		usersCache.Remove(userToken)
-	}()
-
 	client, err := h.service.SetupSession(ctx, ws, userToken)
 	if err != nil {
 		logger.Fatal(err)
 	}
+
+	//TODO: Develop a retry method for closing connection
+	defer func() {
+		_ = ws.Close()
+		client.CloseConnection()
+		cache.GetConnectedUserCache().Remove(userToken)
+	}()
 
 	h.service.HandleSession(ctx, ws, client)
 }

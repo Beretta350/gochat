@@ -13,8 +13,7 @@ import (
 type KafkaClient interface {
 	ProduceMessage(message model.ChatMessage) error
 	ConsumeMessage(ctx context.Context, handler func(model.ChatMessage)) error
-	CloseProducer()
-	CloseConsumer()
+	CloseConnection()
 }
 
 type kafkaClient struct {
@@ -84,21 +83,16 @@ func (u *kafkaClient) ConsumeMessage(ctx context.Context, handler func(model.Cha
 		defer close(errorChan)
 
 		for {
-			msg, err := u.consumer.ReadMessage(-1) // Blocking Kafka read
-			if err != nil {
-				if ctx.Err() != nil {
-					// Exit on context cancellation
-					return
-				}
-				// Send error to the channel
-				errorChan <- err
+			msg, readErr := u.consumer.ReadMessage(-1) // Blocking Kafka read
+			if readErr != nil {
+				errorChan <- readErr
 				continue
 			}
 
 			// Parse and send message to the channel
 			var chatMessage model.ChatMessage
-			if err := json.Unmarshal(msg.Value, &chatMessage); err != nil {
-				logger.Error("Failed to unmarshal Kafka message:", err)
+			if jsonErr := json.Unmarshal(msg.Value, &chatMessage); jsonErr != nil {
+				logger.Error("Failed to unmarshal Kafka message:", jsonErr)
 				continue
 			}
 
@@ -124,15 +118,11 @@ func (u *kafkaClient) ConsumeMessage(ctx context.Context, handler func(model.Cha
 	}
 }
 
-func (u *kafkaClient) CloseProducer() {
+func (u *kafkaClient) CloseConnection() {
+	logger.Info("Closing Kafka connection...")
 	u.producer.Close()
-	logger.Info("Kafka producer closed")
-}
-
-func (u *kafkaClient) CloseConsumer() {
 	err := u.consumer.Close()
 	if err != nil {
 		logger.Fatal("Error closing consumer:", err)
 	}
-	logger.Info("Kafka consumer closed")
 }

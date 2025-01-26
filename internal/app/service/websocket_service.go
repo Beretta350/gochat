@@ -26,8 +26,15 @@ func NewWebsocketService() WebsocketService {
 }
 
 func (s *websocketService) HandleSession(ctx context.Context, ws *websocket.Conn, client messaging.KafkaClient) {
-	go s.startChatMessagesHandler(ctx, client)
-	s.startIncomingMessagesHandler(ws, client)
+	userCtx, cancelUserCtx := context.WithCancel(ctx)
+	wg := &sync.WaitGroup{}
+
+	go s.startChatMessagesHandler(userCtx, client, wg)
+	wg.Add(1)
+	go s.startIncomingMessagesHandler(cancelUserCtx, ws, client, wg)
+	wg.Add(1)
+
+	wg.Wait()
 }
 
 func (s *websocketService) SetupSession(ctx context.Context, ws *websocket.Conn, userToken string) (messaging.KafkaClient, error) {
@@ -49,16 +56,17 @@ func (s *websocketService) SetupSession(ctx context.Context, ws *websocket.Conn,
 	return kafkaClient, nil
 }
 
-func (s *websocketService) startChatMessagesHandler(ctx context.Context, client messaging.KafkaClient) {
-	defer client.CloseConsumer()
+func (s *websocketService) startChatMessagesHandler(ctx context.Context, client messaging.KafkaClient, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	err := client.ConsumeMessage(ctx, handleChatMessages)
 	if err != nil {
 		logger.Error("Error in Kafka consumer:", err)
 	}
 }
 
-func (s *websocketService) startIncomingMessagesHandler(ws *websocket.Conn, client messaging.KafkaClient) {
-	defer client.CloseProducer()
+func (s *websocketService) startIncomingMessagesHandler(cancelCtx context.CancelFunc, ws *websocket.Conn, client messaging.KafkaClient, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for {
 		var msg model.ChatMessage
 		err := ws.ReadJSON(&msg)
@@ -68,6 +76,7 @@ func (s *websocketService) startIncomingMessagesHandler(ws *websocket.Conn, clie
 			} else {
 				logger.Errorf("Error decoding websocket message: %v", err)
 			}
+			cancelCtx()
 			break
 		}
 
