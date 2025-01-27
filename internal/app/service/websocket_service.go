@@ -72,7 +72,7 @@ func (s *websocketService) startIncomingMessagesHandler(cancelCtx context.Cancel
 		err := ws.ReadJSON(&msg)
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				logger.Info("Disconnect message received")
+				logger.Info("Starting user disconnection...")
 			} else {
 				logger.Errorf("Error decoding websocket message: %v", err)
 			}

@@ -77,7 +77,7 @@ func (u *kafkaClient) ConsumeMessage(ctx context.Context, handler func(model.Cha
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Infof("Context canceled for user %s: %v", u.userToken, ctx.Err())
+			logger.Infof("%s context canceled", u.userToken)
 			return nil
 		default:
 			msg, readErr := u.consumer.ReadMessage(3) // Blocking Kafka read
