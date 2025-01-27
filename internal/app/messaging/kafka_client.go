@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/Beretta350/gochat/internal/app/model"
 	"github.com/Beretta350/gochat/pkg/kafka_wrapper"
@@ -73,20 +74,22 @@ func (u *kafkaClient) ConsumeMessage(ctx context.Context, handler func(model.Cha
 		return err
 	}
 
-	// Channels for communication
-	messageChan := make(chan *model.ChatMessage)
-	errorChan := make(chan error)
-
-	// Goroutine for Kafka message consumption
-	go func() {
-		defer close(messageChan)
-		defer close(errorChan)
-
-		for {
-			msg, readErr := u.consumer.ReadMessage(-1) // Blocking Kafka read
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Infof("Context canceled for user %s: %v", u.userToken, ctx.Err())
+			return nil
+		default:
+			msg, readErr := u.consumer.ReadMessage(3) // Blocking Kafka read
 			if readErr != nil {
-				errorChan <- readErr
-				continue
+
+				var kafkaErr kafka.Error
+				if errors.As(readErr, &kafkaErr) && kafkaErr.Code() == kafka.ErrTimedOut {
+					continue
+				}
+
+				logger.Error("Failed to read Kafka message: ", readErr)
+				return readErr
 			}
 
 			// Parse and send message to the channel
@@ -96,33 +99,16 @@ func (u *kafkaClient) ConsumeMessage(ctx context.Context, handler func(model.Cha
 				continue
 			}
 
-			messageChan <- &chatMessage
-		}
-	}()
-
-	// Main loop: listens for context cancellation, messages, or errors
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Infof("Context canceled for user %s: %v", u.userToken, ctx.Err())
-			return nil
-		case chatMessage := <-messageChan:
-			if chatMessage != nil {
-				logger.Info("Kafka message received:", *chatMessage)
-				handler(*chatMessage)
-			}
-		case err := <-errorChan:
-			logger.Error("Error reading Kafka message:", err)
-			return err
+			handler(chatMessage)
 		}
 	}
 }
 
 func (u *kafkaClient) CloseConnection() {
-	logger.Info("Closing Kafka connection...")
 	u.producer.Close()
 	err := u.consumer.Close()
 	if err != nil {
 		logger.Fatal("Error closing consumer:", err)
 	}
+	logger.Infof("%s kafka's connection closed", u.userToken)
 }

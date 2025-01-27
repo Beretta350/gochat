@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"github.com/Beretta350/gochat/pkg/logger"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -38,9 +39,11 @@ func (c *connectedUserCache) Get(username string) *websocket.Conn {
 // Add adds a WebSocket connection to the cache.
 func (c *connectedUserCache) Add(username string, conn *websocket.Conn) {
 	c.connectedUsers.Store(username, conn)
+	logger.Infof("%s added to cache", username)
 }
 
 // Remove removes a WebSocket connection from the cache.
 func (c *connectedUserCache) Remove(username string) {
 	c.connectedUsers.Delete(username)
+	logger.Infof("%s removed from cache", username)
 }
