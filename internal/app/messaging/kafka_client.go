@@ -69,6 +69,11 @@ func (u *kafkaClient) ProduceMessage(message model.ChatMessage) error {
 }
 
 func (u *kafkaClient) ConsumeMessage(ctx context.Context, handler func(model.ChatMessage)) error {
+	//TODO: Have a list of user's consumer topic subscriptions (e.g user's topic and groups the user are in)
+
+	//Get topics that the user are subscribed on the database
+
+	//Subscribe to the fetched topics
 	err := u.consumer.Subscribe(u.userTopicName, nil)
 	if err != nil {
 		return err
