@@ -3,12 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	"github.com/Beretta350/gochat/internal/app/cache"
 	"github.com/Beretta350/gochat/internal/app/messaging"
 	"github.com/Beretta350/gochat/internal/app/model"
 	"github.com/Beretta350/gochat/pkg/logger"
 	"github.com/gorilla/websocket"
-	"sync"
 )
 
 // Mutex for thread-safe access to `users`
@@ -29,9 +30,9 @@ func (s *websocketService) HandleSession(ctx context.Context, ws *websocket.Conn
 	userCtx, cancelUserCtx := context.WithCancel(ctx)
 	wg := &sync.WaitGroup{}
 
-	go s.startChatMessagesHandler(userCtx, client, wg)
+	go s.startChatMessageReciever(userCtx, client, wg)
 	wg.Add(1)
-	go s.startIncomingMessagesHandler(cancelUserCtx, ws, client, wg)
+	go s.startChatMessageSender(cancelUserCtx, ws, client, wg)
 	wg.Add(1)
 
 	wg.Wait()
@@ -56,7 +57,7 @@ func (s *websocketService) SetupSession(ctx context.Context, ws *websocket.Conn,
 	return kafkaClient, nil
 }
 
-func (s *websocketService) startChatMessagesHandler(ctx context.Context, client messaging.KafkaClient, wg *sync.WaitGroup) {
+func (s *websocketService) startChatMessageReciever(ctx context.Context, client messaging.KafkaClient, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	err := client.ConsumeMessage(ctx, handleChatMessages)
@@ -65,7 +66,7 @@ func (s *websocketService) startChatMessagesHandler(ctx context.Context, client 
 	}
 }
 
-func (s *websocketService) startIncomingMessagesHandler(cancelCtx context.CancelFunc, ws *websocket.Conn, client messaging.KafkaClient, wg *sync.WaitGroup) {
+func (s *websocketService) startChatMessageSender(cancelCtx context.CancelFunc, ws *websocket.Conn, client messaging.KafkaClient, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
 		var msg model.ChatMessage
