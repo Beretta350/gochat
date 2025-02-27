@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Beretta350/gochat/pkg/logger"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"sync"
+
+	"github.com/confluentinc/confluent-kafka-go/kafka"
+
+	"github.com/Beretta350/gochat/pkg/logger"
 )
 
 var once sync.Once

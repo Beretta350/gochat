@@ -1,10 +1,11 @@
 package cache
 
 import (
-	"github.com/Beretta350/gochat/pkg/logger"
 	"sync"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/Beretta350/gochat/pkg/logger"
 )
 
 var once sync.Once

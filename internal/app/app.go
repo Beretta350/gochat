@@ -1,19 +1,20 @@
 package app
 
 import (
-	"github.com/Beretta350/gochat/config"
-	"github.com/Beretta350/gochat/internal/app/service"
-	"github.com/Beretta350/gochat/pkg/logger"
 	"net/http"
 
 	"github.com/Beretta350/gochat/internal/app/handler"
+	"github.com/Beretta350/gochat/internal/app/service"
+	"github.com/Beretta350/gochat/internal/config"
+	"github.com/Beretta350/gochat/pkg/logger"
 )
 
 func Run() {
 	serverConfig := config.GetServerConfig()
+	upgrader := config.GetWebsocketUpgrader()
 
 	websocketService := service.NewWebsocketService()
-	websocketHandler := handler.NewWebsocketHandler(websocketService)
+	websocketHandler := handler.NewWebsocketHandler(websocketService, upgrader)
 
 	// Configure WebSocket route
 	http.HandleFunc("/ws", websocketHandler.HandleConnection)

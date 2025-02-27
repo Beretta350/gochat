@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/confluentinc/confluent-kafka-go/kafka"
+
 	"github.com/Beretta350/gochat/internal/app/model"
 	"github.com/Beretta350/gochat/pkg/kafka_wrapper"
 	"github.com/Beretta350/gochat/pkg/logger"
-	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
 type KafkaClient interface {

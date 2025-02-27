@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/gorilla/websocket"
+
 	"github.com/Beretta350/gochat/internal/app/cache"
 	"github.com/Beretta350/gochat/internal/app/messaging"
 	"github.com/Beretta350/gochat/internal/app/model"
 	"github.com/Beretta350/gochat/pkg/logger"
-	"github.com/gorilla/websocket"
 )
 
 // Mutex for thread-safe access to `users`
