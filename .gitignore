@@ -23,3 +23,14 @@ go.work.sum
 
 # env file
 .env
+
+# Generated mocks
+/mocks
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Editor/IDE settings
+.vscode/
+.idea/
