@@ -1,4 +1,4 @@
-package kafkawrapper
+package kafkafactory
 
 import (
 	"sync"
@@ -7,36 +7,36 @@ import (
 )
 
 var consumerOnce sync.Once
-var consumerWrapperInstance *consumerWrapper
+var consumerFactoryInstance *consumerFactory
 
-type ConsumerWrapper interface {
+type ConsumerFactory interface {
 	NewConsumer(groupId string) (ConsumerInterface, error)
 	NewConsumerWithConfig(groupId string, config map[string]interface{}) (ConsumerInterface, error)
 }
 
-type consumerWrapper struct {
+type consumerFactory struct {
 	brokers string
 }
 
-func InitConsumer(brokers string) {
+func Init(brokers string) {
 	consumerOnce.Do(func() {
-		consumerWrapperInstance = &consumerWrapper{
+		consumerFactoryInstance = &consumerFactory{
 			brokers: brokers,
 		}
 	})
-	logger.Info("Kafka consumer wrapper initialized")
+	logger.Info("Kafka consumer factory initialized")
 }
 
 // For testing purposes
-func SetConsumerWrapper(brokers string) {
-	consumerWrapperInstance = &consumerWrapper{
+func SetConsumerFactory(brokers string) {
+	consumerFactoryInstance = &consumerFactory{
 		brokers: brokers,
 	}
 }
 
 // NewConsumer creates a new Kafka consumer with default configuration
 func NewConsumer(groupId string) (ConsumerInterface, error) {
-	adapter, err := NewConsumerAdapter(consumerWrapperInstance.brokers, groupId)
+	adapter, err := NewConsumerAdapter(consumerFactoryInstance.brokers, groupId)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func NewConsumer(groupId string) (ConsumerInterface, error) {
 
 // NewConsumerWithConfig creates a new Kafka consumer with custom configuration
 func NewConsumerWithConfig(groupId string, config map[string]interface{}) (ConsumerInterface, error) {
-	adapter, err := NewConsumerAdapterWithConfig(consumerWrapperInstance.brokers, groupId, config)
+	adapter, err := NewConsumerAdapterWithConfig(consumerFactoryInstance.brokers, groupId, config)
 	if err != nil {
 		return nil, err
 	}
@@ -55,5 +55,5 @@ func NewConsumerWithConfig(groupId string, config map[string]interface{}) (Consu
 // CloseConsumer is a placeholder as consumers are created on demand
 func CloseConsumer() {
 	// Actual closing happens when each consumer instance is closed
-	logger.Info("Kafka consumer wrapper resources released")
+	logger.Info("Kafka consumer factory resources released")
 }

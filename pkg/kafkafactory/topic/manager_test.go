@@ -1,4 +1,4 @@
-package kafkawrapper
+package kafkafactory
 
 import (
 	"context"

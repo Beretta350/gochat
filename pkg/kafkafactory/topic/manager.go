@@ -1,4 +1,4 @@
-package kafkawrapper
+package kafkafactory
 
 import (
 	"context"
@@ -7,54 +7,55 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 
+	client "github.com/Beretta350/gochat/pkg/kafkafactory/client"
 	"github.com/Beretta350/gochat/pkg/logger"
 )
 
 var once sync.Once
 
-var clientWrapperInstance *clientWrapper
+var topicManagerInstance *topicManager
 
-type ClientWrapper interface {
+type TopicManager interface {
 	CreateTopic(ctx context.Context, name string) error
 	DeleteTopic(ctx context.Context, name string) error
 	Close()
 }
 
-type clientWrapper struct {
-	adminClient AdminClientInterface
+type topicManager struct {
+	adminClient client.AdminClientInterface
 	brokers     string
 }
 
 func Init(brokers string) {
 	once.Do(func() {
-		adminClient, err := NewAdminClientAdapter(brokers)
+		adminClient, err := client.NewAdminClientAdapter(brokers)
 		if err != nil {
 			logger.Fatal(err)
 		}
 
-		clientWrapperInstance = &clientWrapper{
+		topicManagerInstance = &topicManager{
 			adminClient: adminClient,
 			brokers:     brokers,
 		}
 	})
-	logger.Info("Kafka admin client wrapper initialized")
+	logger.Info("Kafka admin client factory initialized")
 }
 
 // For testing purposes
-func SetAdminClient(client AdminClientInterface) {
-	if clientWrapperInstance == nil {
-		clientWrapperInstance = &clientWrapper{
+func SetAdminClient(client client.AdminClientInterface) {
+	if topicManagerInstance == nil {
+		topicManagerInstance = &topicManager{
 			adminClient: client,
 			brokers:     "test-broker",
 		}
 	} else {
-		clientWrapperInstance.adminClient = client
+		topicManagerInstance.adminClient = client
 	}
 }
 
 func CreateTopic(ctx context.Context, name string) error {
 	// Check if the topic already exists
-	describeTopics, err := clientWrapperInstance.adminClient.GetMetadata(&name, false, 5000)
+	describeTopics, err := topicManagerInstance.adminClient.GetMetadata(&name, false, 5000)
 	if err != nil {
 		return err
 	}
@@ -69,7 +70,7 @@ func CreateTopic(ctx context.Context, name string) error {
 		ReplicationFactor: 1,
 	}
 
-	results, err := clientWrapperInstance.adminClient.CreateTopics(ctx, []kafka.TopicSpecification{topicSpec})
+	results, err := topicManagerInstance.adminClient.CreateTopics(ctx, []kafka.TopicSpecification{topicSpec})
 	if err != nil {
 		return err
 	}
@@ -82,7 +83,7 @@ func CreateTopic(ctx context.Context, name string) error {
 }
 
 func DeleteTopic(ctx context.Context, name string) error {
-	results, err := clientWrapperInstance.adminClient.DeleteTopics(ctx, []string{name})
+	results, err := topicManagerInstance.adminClient.DeleteTopics(ctx, []string{name})
 	if err != nil {
 		return err
 	}
@@ -95,5 +96,5 @@ func DeleteTopic(ctx context.Context, name string) error {
 }
 
 func Close() {
-	clientWrapperInstance.adminClient.Close()
+	topicManagerInstance.adminClient.Close()
 }

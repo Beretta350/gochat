@@ -10,9 +10,9 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 
 	"github.com/Beretta350/gochat/internal/app/model"
-	clientwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/client"
-	consumerwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/consumer"
-	producerwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/producer"
+	consumerfactory "github.com/Beretta350/gochat/pkg/kafkafactory/consumer"
+	producerfactory "github.com/Beretta350/gochat/pkg/kafkafactory/producer"
+	topicmanager "github.com/Beretta350/gochat/pkg/kafkafactory/topic"
 	"github.com/Beretta350/gochat/pkg/logger"
 )
 
@@ -26,25 +26,25 @@ type kafkaClient struct {
 	userToken        string
 	userTopicName    string
 	userConsumerName string
-	producer         producerwrapper.ProducerInterface
-	consumer         consumerwrapper.ConsumerInterface
+	producer         producerfactory.ProducerInterface
+	consumer         consumerfactory.ConsumerInterface
 }
 
 func NewKafkaClient(ctx context.Context, token string) (KafkaClient, error) {
 	userTopicName := token + "-topic"
 	userConsumerName := token + "-consumer"
 
-	err := clientwrapper.CreateTopic(ctx, userTopicName)
+	err := topicmanager.CreateTopic(ctx, userTopicName)
 	if err != nil {
 		return nil, fmt.Errorf("user topic %s creation error", userTopicName)
 	}
 
-	producer, err := producerwrapper.NewProducer()
+	producer, err := producerfactory.NewProducer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create producer: %w", err)
 	}
 
-	consumer, err := consumerwrapper.NewConsumer(userConsumerName)
+	consumer, err := consumerfactory.NewConsumer(userConsumerName)
 	if err != nil {
 		producer.Close()
 		return nil, fmt.Errorf("failed to create consumer: %w", err)

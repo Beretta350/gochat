@@ -1,4 +1,4 @@
-package kafkawrapper
+package kafkafactory
 
 import (
 	"sync"
@@ -7,37 +7,37 @@ import (
 )
 
 var producerOnce sync.Once
-var producerWrapperInstance *producerWrapper
+var producerFactoryInstance *producerFactory
 
-type ProducerWrapper interface {
+type ProducerFactory interface {
 	NewProducer() (ProducerInterface, error)
 	NewProducerWithConfig(config map[string]interface{}) (ProducerInterface, error)
 	Close()
 }
 
-type producerWrapper struct {
+type producerFactory struct {
 	brokers string
 }
 
-func InitProducer(brokers string) {
+func Init(brokers string) {
 	producerOnce.Do(func() {
-		producerWrapperInstance = &producerWrapper{
+		producerFactoryInstance = &producerFactory{
 			brokers: brokers,
 		}
 	})
-	logger.Info("Kafka producer wrapper initialized")
+	logger.Info("Kafka producer factory initialized")
 }
 
 // For testing purposes
-func SetProducerWrapper(brokers string) {
-	producerWrapperInstance = &producerWrapper{
+func SetProducerFactory(brokers string) {
+	producerFactoryInstance = &producerFactory{
 		brokers: brokers,
 	}
 }
 
 // NewProducer creates a new Kafka producer with default configuration
 func NewProducer() (ProducerInterface, error) {
-	adapter, err := NewProducerAdapter(producerWrapperInstance.brokers)
+	adapter, err := NewProducerAdapter(producerFactoryInstance.brokers)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func NewProducer() (ProducerInterface, error) {
 
 // NewProducerWithConfig creates a new Kafka producer with custom configuration
 func NewProducerWithConfig(config map[string]interface{}) (ProducerInterface, error) {
-	adapter, err := NewProducerAdapterWithConfig(producerWrapperInstance.brokers, config)
+	adapter, err := NewProducerAdapterWithConfig(producerFactoryInstance.brokers, config)
 	if err != nil {
 		return nil, err
 	}
@@ -57,5 +57,5 @@ func NewProducerWithConfig(config map[string]interface{}) (ProducerInterface, er
 func CloseProducer() {
 	// This is a placeholder as producers are created on demand
 	// Actual closing happens when each producer instance is closed
-	logger.Info("Kafka producer wrapper resources released")
+	logger.Info("Kafka producer factory resources released")
 }

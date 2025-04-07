@@ -9,9 +9,9 @@ import (
 
 	"github.com/Beretta350/gochat/internal/app/adapters/wsadapter"
 	"github.com/Beretta350/gochat/pkg/envutil"
-	clientwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/client"
-	consumerwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/consumer"
-	producerwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/producer"
+	consumerfactory "github.com/Beretta350/gochat/pkg/kafkafactory/consumer"
+	producerfactory "github.com/Beretta350/gochat/pkg/kafkafactory/producer"
+	topicmanager "github.com/Beretta350/gochat/pkg/kafkafactory/topic"
 	"github.com/Beretta350/gochat/pkg/logger"
 )
 
@@ -37,9 +37,9 @@ func init() {
 	logger.Init(env)
 
 	// Setup Kafka components
-	clientwrapper.Init(kafkaBrokers)           // Admin client for topic management
-	producerwrapper.InitProducer(kafkaBrokers) // Producer initialization
-	consumerwrapper.InitConsumer(kafkaBrokers) // Consumer initialization
+	topicmanager.Init(kafkaBrokers)    // Admin client for topic management
+	producerfactory.Init(kafkaBrokers) // Producer initialization
+	consumerfactory.Init(kafkaBrokers) // Consumer initialization
 
 	setupApplication(env)
 

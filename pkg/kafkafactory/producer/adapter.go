@@ -1,4 +1,4 @@
-package kafkawrapper
+package kafkafactory
 
 import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
