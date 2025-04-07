@@ -1,15 +1,18 @@
-package messaging
+package kafkaclient
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 
 	"github.com/Beretta350/gochat/internal/app/model"
-	"github.com/Beretta350/gochat/pkg/kafka_wrapper"
+	clientwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/client"
+	consumerwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/consumer"
+	producerwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/producer"
 	"github.com/Beretta350/gochat/pkg/logger"
 )
 
@@ -23,25 +26,25 @@ type kafkaClient struct {
 	userToken        string
 	userTopicName    string
 	userConsumerName string
-	producer         *kafka.Producer
-	consumer         *kafka.Consumer
+	producer         producerwrapper.ProducerInterface
+	consumer         consumerwrapper.ConsumerInterface
 }
 
 func NewKafkaClient(ctx context.Context, token string) (KafkaClient, error) {
 	userTopicName := token + "-topic"
 	userConsumerName := token + "-consumer"
 
-	err := kafka_wrapper.CreateTopic(ctx, userTopicName)
+	err := clientwrapper.CreateTopic(ctx, userTopicName)
 	if err != nil {
 		return nil, fmt.Errorf("user topic %s creation error", userTopicName)
 	}
 
-	producer, err := kafka_wrapper.NewProducer()
+	producer, err := producerwrapper.NewProducer()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create producer: %w", err)
 	}
 
-	consumer, err := kafka_wrapper.NewConsumer(userConsumerName)
+	consumer, err := consumerwrapper.NewConsumer(userConsumerName)
 	if err != nil {
 		producer.Close()
 		return nil, fmt.Errorf("failed to create consumer: %w", err)
@@ -87,7 +90,7 @@ func (u *kafkaClient) ConsumeMessage(ctx context.Context, handler func(model.Cha
 			logger.Infof("%s context canceled", u.userToken)
 			return nil
 		default:
-			msg, readErr := u.consumer.ReadMessage(3) // Blocking Kafka read
+			msg, readErr := u.consumer.ReadMessage(3 * time.Second) // 3 seconds timeout
 			if readErr != nil {
 
 				var kafkaErr kafka.Error

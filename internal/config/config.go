@@ -5,13 +5,14 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 
-	"github.com/Beretta350/gochat/internal/config/wsupgrader"
-	"github.com/Beretta350/gochat/pkg/kafka_wrapper"
+	"github.com/Beretta350/gochat/internal/app/adapters/wsadapter"
+	"github.com/Beretta350/gochat/pkg/envutil"
+	clientwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/client"
+	consumerwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/consumer"
+	producerwrapper "github.com/Beretta350/gochat/pkg/kafkawrapper/producer"
 	"github.com/Beretta350/gochat/pkg/logger"
-	"github.com/Beretta350/gochat/pkg/util"
 )
 
 var (
@@ -22,7 +23,7 @@ var (
 )
 
 func init() {
-	env := util.GetEnv("ENV", "dev") // Default to "dev"
+	env := envutil.GetEnv("ENV", "dev") // Default to "dev"
 	if env == "local" {
 		configPath := filepath.Join(configsDir, "local.env")
 		if err := godotenv.Load(configPath); err != nil {
@@ -30,13 +31,15 @@ func init() {
 		}
 	}
 
-	kafkaBrokers := util.GetEnv("KAFKA_BROKER", "kafka:9092")
+	kafkaBrokers := envutil.GetEnv("KAFKA_BROKER", "kafka:9092")
 
 	// Setup logger before all
 	logger.Init(env)
 
-	// Setup kafka admin client and wrapper
-	kafka_wrapper.Init(kafkaBrokers)
+	// Setup Kafka components
+	clientwrapper.Init(kafkaBrokers)           // Admin client for topic management
+	producerwrapper.InitProducer(kafkaBrokers) // Producer initialization
+	consumerwrapper.InitConsumer(kafkaBrokers) // Consumer initialization
 
 	setupApplication(env)
 
@@ -48,7 +51,7 @@ var instance *Config
 
 type Config struct {
 	Server   *ServerConfig
-	Upgrader *websocket.Upgrader
+	Upgrader wsadapter.Upgrader
 }
 
 // ServerConfig holds the server configuration
@@ -59,19 +62,19 @@ type ServerConfig struct {
 func setupApplication(env string) *Config {
 	once.Do(func() {
 		serverConfig := &ServerConfig{
-			Port: util.GetEnv("SERVER_PORT", "8080"),
+			Port: envutil.GetEnv("SERVER_PORT", "8080"),
 		}
 
-		var upgrader websocket.Upgrader
+		var upgrader wsadapter.Upgrader
 		if env != "prod" {
-			upgrader = wsupgrader.NewUpgrader(
-				util.GetEnvInt("WS_READ_BUFFER_SIZE", 1024),
-				util.GetEnvInt("WS_WRITE_BUFFER_SIZE", 1024),
-				util.GetEnvBool("WS_CHECK_ORIGIN", true),
+			upgrader = wsadapter.NewUpgrader(
+				envutil.GetEnvInt("WS_READ_BUFFER_SIZE", 1024),
+				envutil.GetEnvInt("WS_WRITE_BUFFER_SIZE", 1024),
+				envutil.GetEnvBool("WS_CHECK_ORIGIN", true),
 			)
 		}
 
-		instance = &Config{Server: serverConfig, Upgrader: &upgrader}
+		instance = &Config{Server: serverConfig, Upgrader: upgrader}
 	})
 	return instance
 }
@@ -80,6 +83,6 @@ func GetServerConfig() *ServerConfig {
 	return instance.Server
 }
 
-func GetWebsocketUpgrader() *websocket.Upgrader {
+func GetWebsocketUpgrader() wsadapter.Upgrader {
 	return instance.Upgrader
 }

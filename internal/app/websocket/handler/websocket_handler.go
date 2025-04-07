@@ -6,8 +6,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/Beretta350/gochat/internal/app/adapters/wsadapter"
 	"github.com/Beretta350/gochat/internal/app/cache"
-	"github.com/Beretta350/gochat/internal/app/service"
+	"github.com/Beretta350/gochat/internal/app/websocket/service"
 	"github.com/Beretta350/gochat/pkg/logger"
 )
 
@@ -17,10 +18,10 @@ type WebsocketHandler interface {
 
 type websocketHandler struct {
 	service  service.WebsocketService
-	upgrader *websocket.Upgrader
+	upgrader wsadapter.Upgrader
 }
 
-func NewWebsocketHandler(s service.WebsocketService, u *websocket.Upgrader) WebsocketHandler {
+func NewWebsocketHandler(s service.WebsocketService, u wsadapter.Upgrader) WebsocketHandler {
 	return &websocketHandler{service: s, upgrader: u}
 }
 

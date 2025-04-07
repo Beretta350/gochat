@@ -7,8 +7,9 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/Beretta350/gochat/internal/app/adapters/wsadapter"
 	"github.com/Beretta350/gochat/internal/app/cache"
-	"github.com/Beretta350/gochat/internal/app/messaging"
+	"github.com/Beretta350/gochat/internal/app/kafkaclient"
 	"github.com/Beretta350/gochat/internal/app/model"
 	"github.com/Beretta350/gochat/pkg/logger"
 )
@@ -17,8 +18,8 @@ import (
 var mutex = &sync.Mutex{}
 
 type WebsocketService interface {
-	HandleSession(ctx context.Context, ws *websocket.Conn, client messaging.KafkaClient)
-	SetupSession(ctx context.Context, ws *websocket.Conn, userToken string) (messaging.KafkaClient, error)
+	HandleSession(ctx context.Context, ws wsadapter.Conn, client kafkaclient.KafkaClient)
+	SetupSession(ctx context.Context, ws wsadapter.Conn, userToken string) (kafkaclient.KafkaClient, error)
 }
 
 type websocketService struct{}
@@ -27,7 +28,7 @@ func NewWebsocketService() WebsocketService {
 	return &websocketService{}
 }
 
-func (s *websocketService) HandleSession(ctx context.Context, ws *websocket.Conn, client messaging.KafkaClient) {
+func (s *websocketService) HandleSession(ctx context.Context, ws wsadapter.Conn, client kafkaclient.KafkaClient) {
 	userCtx, cancelUserCtx := context.WithCancel(ctx)
 	wg := &sync.WaitGroup{}
 
@@ -39,7 +40,7 @@ func (s *websocketService) HandleSession(ctx context.Context, ws *websocket.Conn
 	wg.Wait()
 }
 
-func (s *websocketService) SetupSession(ctx context.Context, ws *websocket.Conn, userToken string) (messaging.KafkaClient, error) {
+func (s *websocketService) SetupSession(ctx context.Context, ws wsadapter.Conn, userToken string) (kafkaclient.KafkaClient, error) {
 	usersCache := cache.GetConnectedUserCache()
 	logger.Info("Initial handshake received for: ", userToken)
 
@@ -48,7 +49,7 @@ func (s *websocketService) SetupSession(ctx context.Context, ws *websocket.Conn,
 		return nil, fmt.Errorf("user %s is already connected", userToken)
 	}
 
-	kafkaClient, err := messaging.NewKafkaClient(ctx, userToken)
+	kafkaClient, err := kafkaclient.NewKafkaClient(ctx, userToken)
 	if err != nil {
 		return nil, fmt.Errorf("kafka client creation error: %w", err)
 	}
@@ -58,7 +59,7 @@ func (s *websocketService) SetupSession(ctx context.Context, ws *websocket.Conn,
 	return kafkaClient, nil
 }
 
-func (s *websocketService) startChatMessageReciever(ctx context.Context, client messaging.KafkaClient, wg *sync.WaitGroup) {
+func (s *websocketService) startChatMessageReciever(ctx context.Context, client kafkaclient.KafkaClient, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	err := client.ConsumeMessage(ctx, handleChatMessages)
@@ -67,7 +68,7 @@ func (s *websocketService) startChatMessageReciever(ctx context.Context, client 
 	}
 }
 
-func (s *websocketService) startChatMessageSender(cancelCtx context.CancelFunc, ws *websocket.Conn, client messaging.KafkaClient, wg *sync.WaitGroup) {
+func (s *websocketService) startChatMessageSender(cancelCtx context.CancelFunc, ws wsadapter.Conn, client kafkaclient.KafkaClient, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
 		var msg model.ChatMessage

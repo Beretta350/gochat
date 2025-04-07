@@ -1,10 +1,10 @@
 package app
 
 import (
+	"github.com/Beretta350/gochat/internal/app/websocket/handler"
+	"github.com/Beretta350/gochat/internal/app/websocket/service"
 	"net/http"
 
-	"github.com/Beretta350/gochat/internal/app/handler"
-	"github.com/Beretta350/gochat/internal/app/service"
 	"github.com/Beretta350/gochat/internal/config"
 	"github.com/Beretta350/gochat/pkg/logger"
 )

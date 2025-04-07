@@ -3,17 +3,17 @@ package cache
 import (
 	"sync"
 
-	"github.com/gorilla/websocket"
-
 	"github.com/Beretta350/gochat/pkg/logger"
+
+	"github.com/Beretta350/gochat/internal/app/adapters/wsadapter"
 )
 
 var once sync.Once
 var instance *connectedUserCache
 
 type WebsocketConnectionCache interface {
-	Get(username string) *websocket.Conn
-	Add(username string, conn *websocket.Conn)
+	Get(username string) wsadapter.Conn
+	Add(username string, conn wsadapter.Conn)
 	Remove(username string)
 }
 
@@ -29,16 +29,16 @@ func GetConnectedUserCache() WebsocketConnectionCache {
 	return instance
 }
 
-func (c *connectedUserCache) Get(username string) *websocket.Conn {
+func (c *connectedUserCache) Get(username string) wsadapter.Conn {
 	conn, ok := c.connectedUsers.Load(username)
 	if ok {
-		return conn.(*websocket.Conn)
+		return conn.(wsadapter.Conn)
 	}
 	return nil
 }
 
 // Add adds a WebSocket connection to the cache.
-func (c *connectedUserCache) Add(username string, conn *websocket.Conn) {
+func (c *connectedUserCache) Add(username string, conn wsadapter.Conn) {
 	c.connectedUsers.Store(username, conn)
 	logger.Infof("%s added to cache", username)
 }
