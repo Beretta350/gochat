@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
@@ -10,6 +13,8 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
 	"github.com/Beretta350/gochat/internal/app/chat"
+	"github.com/Beretta350/gochat/internal/app/repository"
+	"github.com/Beretta350/gochat/internal/app/worker"
 	"github.com/Beretta350/gochat/internal/config"
 	applogger "github.com/Beretta350/gochat/pkg/logger"
 	"github.com/Beretta350/gochat/pkg/redisclient"
@@ -17,6 +22,20 @@ import (
 
 func Run() {
 	serverConfig := config.GetServerConfig()
+
+	// Create context that cancels on shutdown signals
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle shutdown signals
+	go handleShutdown(cancel)
+
+	// Create repository (in-memory for now, will be Postgres later)
+	messageRepo := repository.NewInMemoryMessageRepository()
+
+	// Start message worker (processes stream and saves to DB)
+	messageWorker := worker.NewMessageWorker(messageRepo, "worker-1")
+	go messageWorker.Start(ctx)
 
 	// Create chat service
 	chatService := chat.NewService()
@@ -59,9 +78,6 @@ func Run() {
 			return
 		}
 
-		// Create context for this connection
-		ctx := context.Background()
-
 		// Handle the WebSocket connection
 		chatService.HandleConnection(ctx, c, userToken)
 	}))
@@ -69,6 +85,7 @@ func Run() {
 	// Graceful shutdown
 	app.Hooks().OnShutdown(func() error {
 		applogger.Info("Shutting down...")
+		cancel() // Cancel context to stop workers
 		return redisclient.Close()
 	})
 
@@ -77,4 +94,12 @@ func Run() {
 	if err := app.Listen(":" + serverConfig.Port); err != nil {
 		applogger.Fatal("Failed to start server:", err)
 	}
+}
+
+func handleShutdown(cancel context.CancelFunc) {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+	applogger.Info("Shutdown signal received")
+	cancel()
 }

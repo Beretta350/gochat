@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/contrib/websocket"
+	"github.com/google/uuid"
 
 	"github.com/Beretta350/gochat/internal/app/model"
 	"github.com/Beretta350/gochat/pkg/logger"
@@ -51,6 +52,12 @@ func (c *ConnectedUsers) Get(userToken string) *websocket.Conn {
 	return nil
 }
 
+// IsOnline checks if a user is online
+func (c *ConnectedUsers) IsOnline(userToken string) bool {
+	_, ok := c.connections.Load(userToken)
+	return ok
+}
+
 // Service handles chat operations
 type Service struct {
 	users *ConnectedUsers
@@ -73,11 +80,54 @@ func (s *Service) HandleConnection(ctx context.Context, conn *websocket.Conn, us
 	userCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Deliver pending messages first
+	s.deliverPendingMessages(userCtx, conn, userToken)
+
 	// Start listening to Redis for messages directed to this user
 	go s.listenForMessages(userCtx, conn, userToken)
 
 	// Read messages from WebSocket and publish to Redis
 	s.readAndPublishMessages(userCtx, conn, userToken)
+}
+
+// deliverPendingMessages delivers any messages that were sent while user was offline
+func (s *Service) deliverPendingMessages(ctx context.Context, conn *websocket.Conn, userToken string) {
+	messages, err := redisclient.GetPendingMessages(ctx, userToken)
+	if err != nil {
+		logger.Errorf("Error getting pending messages for %s: %v", userToken, err)
+		return
+	}
+
+	if len(messages) == 0 {
+		return
+	}
+
+	logger.Infof("Delivering %d pending messages to %s", len(messages), userToken)
+
+	for _, msgJSON := range messages {
+		// Parse to add received_at
+		var chatMsg model.ChatMessage
+		if err := json.Unmarshal([]byte(msgJSON), &chatMsg); err != nil {
+			logger.Errorf("Error parsing pending message: %v", err)
+			continue
+		}
+
+		// Mark as received
+		chatMsg.MarkReceived()
+
+		// Re-serialize
+		msgWithTimestamp, err := json.Marshal(chatMsg)
+		if err != nil {
+			logger.Errorf("Error marshaling message: %v", err)
+			continue
+		}
+
+		// Send to WebSocket
+		if err := conn.WriteMessage(websocket.TextMessage, msgWithTimestamp); err != nil {
+			logger.Errorf("Error sending pending message to %s: %v", userToken, err)
+			return
+		}
+	}
 }
 
 // listenForMessages subscribes to Redis channel for this user
@@ -152,30 +202,54 @@ func (s *Service) readAndPublishMessages(ctx context.Context, conn *websocket.Co
 				continue
 			}
 
-			// Set sender and sent_at timestamp
+			// Set ID, sender and sent_at timestamp
+			chatMsg.ID = uuid.New().String()
 			chatMsg.Sender = userToken
 			chatMsg.SentAt = time.Now().UnixMilli()
+			if chatMsg.Type == "" {
+				chatMsg.Type = "text"
+			}
 
-			// Publish to recipient's channel
-			s.publishMessage(ctx, &chatMsg)
+			// Process and route the message
+			s.processMessage(ctx, &chatMsg)
 		}
 	}
 }
 
-// publishMessage publishes a message to the recipient's Redis channel
-func (s *Service) publishMessage(ctx context.Context, msg *model.ChatMessage) {
-	recipientChannel := "user:" + msg.Recipient
-
+// processMessage handles message routing and persistence
+func (s *Service) processMessage(ctx context.Context, msg *model.ChatMessage) {
 	msgJSON, err := json.Marshal(msg)
 	if err != nil {
 		logger.Errorf("Error marshaling message: %v", err)
 		return
 	}
 
-	if err := redisclient.Publish(ctx, recipientChannel, msgJSON); err != nil {
-		logger.Errorf("Error publishing message to %s: %v", msg.Recipient, err)
-		return
+	// 1. Add to Redis Stream (for persistence worker)
+	streamID, err := redisclient.AddToStream(ctx, map[string]interface{}{
+		"data": string(msgJSON),
+	})
+	if err != nil {
+		logger.Errorf("Error adding to stream: %v", err)
+		// Continue anyway - real-time delivery is more important
+	} else {
+		logger.Infof("Message added to stream with ID: %s", streamID)
 	}
 
-	logger.Infof("Message from %s to %s published", msg.Sender, msg.Recipient)
+	// 2. Check if recipient is online
+	if s.users.IsOnline(msg.Recipient) {
+		// Online: publish to Pub/Sub for real-time delivery
+		recipientChannel := "user:" + msg.Recipient
+		if err := redisclient.Publish(ctx, recipientChannel, msgJSON); err != nil {
+			logger.Errorf("Error publishing message to %s: %v", msg.Recipient, err)
+		} else {
+			logger.Infof("Message from %s to %s published (online)", msg.Sender, msg.Recipient)
+		}
+	} else {
+		// Offline: add to pending queue
+		if err := redisclient.AddToPending(ctx, msg.Recipient, string(msgJSON)); err != nil {
+			logger.Errorf("Error adding to pending for %s: %v", msg.Recipient, err)
+		} else {
+			logger.Infof("Message from %s to %s queued (offline)", msg.Sender, msg.Recipient)
+		}
+	}
 }
