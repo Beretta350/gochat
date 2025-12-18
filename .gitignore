@@ -7,6 +7,7 @@
 *.dll
 *.so
 *.dylib
+*.iml
 
 # Test binary, built with `go test -c`
 *.test
@@ -23,3 +24,28 @@ go.work.sum
 
 # env file
 .env
+
+# Generated mocks
+/mocks
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Editor/IDE settings
+.vscode/
+.idea/
+
+# Build artifacts
+/bin/
+/tmp/
+
+# Coverage
+coverage.out
+coverage.html
+
+# Air (hot reload)
+build-errors.log
+
+# OS files
+.DS_Store

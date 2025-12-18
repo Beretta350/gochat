@@ -1,27 +1,41 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
 
-//TODO: Put some validator (required fields and rules)
-
+// ChatMessage represents a chat message
 type ChatMessage struct {
+	ID        string    `json:"id,omitempty"`
 	Sender    string    `json:"sender"`
-	Content   string    `json:"content"`
 	Recipient string    `json:"recipient"`
-	Created   time.Time `json:"created"`
+	Content   string    `json:"content"`
+	Type      string    `json:"type,omitempty"` // "text", "image", "file"
+	CreatedAt time.Time `json:"created_at"`
 }
 
-func (m ChatMessage) Send() error {
-	return nil
+// NewChatMessage creates a new chat message with current timestamp
+func NewChatMessage(sender, recipient, content string) *ChatMessage {
+	return &ChatMessage{
+		Sender:    sender,
+		Recipient: recipient,
+		Content:   content,
+		Type:      "text",
+		CreatedAt: time.Now(),
+	}
 }
 
-// Implement the String() method
+// String returns a string representation of the message
 func (m ChatMessage) String() string {
 	return fmt.Sprintf(
-		"{sender: %s, content: %s, recipient: %s, created: %s}",
-		m.Sender, m.Content, m.Recipient, m.Created.String(),
+		"{sender: %s, recipient: %s, content: %s, created: %s}",
+		m.Sender, m.Recipient, m.Content, m.CreatedAt.Format(time.RFC3339),
 	)
+}
+
+// Bytes returns the JSON representation of the message
+func (m ChatMessage) Bytes() ([]byte, error) {
+	return json.Marshal(m)
 }

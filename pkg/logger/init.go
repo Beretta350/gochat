@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/Beretta350/gochat/pkg/util"
+	"github.com/Beretta350/gochat/pkg/envutil"
 )
 
 var once sync.Once
@@ -17,8 +17,8 @@ var once sync.Once
 func Init(environment string) {
 	once.Do(func() {
 		// Read environment variables
-		level := util.GetEnv("LOG_LEVEL", "info")          // Default to "info"
-		outputPaths := util.GetEnv("LOG_OUTPUT", "stdout") // Default to "stdout"
+		level := envutil.GetEnv("LOG_LEVEL", "info")          // Default to "info"
+		outputPaths := envutil.GetEnv("LOG_OUTPUT", "stdout") // Default to "stdout"
 
 		// Parse log level
 		var logLevel zapcore.Level
