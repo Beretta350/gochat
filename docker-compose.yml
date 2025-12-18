@@ -1,6 +1,22 @@
-version: '3.8'
-
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gochat-app
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV=dev
+      - SERVER_PORT=8080
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=
+      - REDIS_DB=0
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: gochat-redis

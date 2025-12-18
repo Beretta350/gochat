@@ -1,4 +1,5 @@
-.PHONY: all build run dev test lint fmt clean docker-up docker-down docker-logs help
+.PHONY: all build run dev test lint fmt clean help
+.PHONY: docker-up docker-down docker-logs docker-build docker-run docker-stop
 
 # Variables
 APP_NAME=gochat
@@ -16,13 +17,17 @@ help:
 	@echo "Targets:"
 	@grep -E '^## ' Makefile | sed 's/## /  /'
 
+# ========================
+# Local Development
+# ========================
+
 ## build: Build the application
 build:
 	@echo "$(GREEN)Building...$(NC)"
 	@go build -o $(BINARY_PATH) $(MAIN_PATH)
 	@echo "$(GREEN)Built $(BINARY_PATH)$(NC)"
 
-## run: Run the application
+## run: Run the application locally
 run:
 	@go run $(MAIN_PATH)
 
@@ -66,28 +71,9 @@ tidy:
 ## clean: Clean build artifacts
 clean:
 	@echo "$(GREEN)Cleaning...$(NC)"
-	@rm -rf bin/
+	@rm -rf bin/ tmp/
 	@rm -f coverage.out coverage.html
 	@echo "$(GREEN)Cleaned$(NC)"
-
-## docker-up: Start Docker containers
-docker-up:
-	@echo "$(GREEN)Starting Docker containers...$(NC)"
-	@docker-compose up -d
-	@echo "$(GREEN)Containers started$(NC)"
-
-## docker-down: Stop Docker containers
-docker-down:
-	@echo "$(GREEN)Stopping Docker containers...$(NC)"
-	@docker-compose down
-	@echo "$(GREEN)Containers stopped$(NC)"
-
-## docker-logs: Show Docker logs
-docker-logs:
-	@docker-compose logs -f
-
-## docker-restart: Restart Docker containers
-docker-restart: docker-down docker-up
 
 ## setup: Install development dependencies
 setup:
@@ -99,3 +85,58 @@ setup:
 
 ## all: Run fmt, lint, test, and build
 all: fmt lint test build
+
+# ========================
+# Docker - Redis only
+# ========================
+
+## redis-up: Start only Redis container
+redis-up:
+	@echo "$(GREEN)Starting Redis...$(NC)"
+	@docker-compose up -d redis redis-commander
+	@echo "$(GREEN)Redis started$(NC)"
+
+## redis-down: Stop Redis container
+redis-down:
+	@echo "$(GREEN)Stopping Redis...$(NC)"
+	@docker-compose down
+	@echo "$(GREEN)Redis stopped$(NC)"
+
+# ========================
+# Docker - Full stack
+# ========================
+
+## docker-build: Build Docker image
+docker-build:
+	@echo "$(GREEN)Building Docker image...$(NC)"
+	@docker-compose build
+	@echo "$(GREEN)Image built$(NC)"
+
+## docker-up: Start all containers (app + redis)
+docker-up:
+	@echo "$(GREEN)Starting all containers...$(NC)"
+	@docker-compose up -d
+	@echo "$(GREEN)Containers started$(NC)"
+	@echo "$(GREEN)App: http://localhost:8080$(NC)"
+	@echo "$(GREEN)Redis UI: http://localhost:8081$(NC)"
+
+## docker-down: Stop all containers
+docker-down:
+	@echo "$(GREEN)Stopping containers...$(NC)"
+	@docker-compose down
+	@echo "$(GREEN)Containers stopped$(NC)"
+
+## docker-logs: Show Docker logs
+docker-logs:
+	@docker-compose logs -f
+
+## docker-logs-app: Show only app logs
+docker-logs-app:
+	@docker-compose logs -f app
+
+## docker-restart: Rebuild and restart all containers
+docker-restart:
+	@echo "$(GREEN)Restarting containers...$(NC)"
+	@docker-compose down
+	@docker-compose up -d --build
+	@echo "$(GREEN)Containers restarted$(NC)"
