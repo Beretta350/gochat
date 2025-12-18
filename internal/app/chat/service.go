@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/gofiber/contrib/websocket"
 
@@ -100,8 +101,25 @@ func (s *Service) listenForMessages(ctx context.Context, conn *websocket.Conn, u
 				return
 			}
 
+			// Parse message to add received_at
+			var chatMsg model.ChatMessage
+			if err := json.Unmarshal([]byte(msg.Payload), &chatMsg); err != nil {
+				logger.Errorf("Error parsing message: %v", err)
+				continue
+			}
+
+			// Mark as received
+			chatMsg.MarkReceived()
+
+			// Re-serialize with received_at
+			msgWithTimestamp, err := json.Marshal(chatMsg)
+			if err != nil {
+				logger.Errorf("Error marshaling message: %v", err)
+				continue
+			}
+
 			// Send message to WebSocket
-			if err := conn.WriteMessage(websocket.TextMessage, []byte(msg.Payload)); err != nil {
+			if err := conn.WriteMessage(websocket.TextMessage, msgWithTimestamp); err != nil {
 				logger.Errorf("Error writing to WebSocket for %s: %v", userToken, err)
 				return
 			}
@@ -134,8 +152,9 @@ func (s *Service) readAndPublishMessages(ctx context.Context, conn *websocket.Co
 				continue
 			}
 
-			// Set sender
+			// Set sender and sent_at timestamp
 			chatMsg.Sender = userToken
+			chatMsg.SentAt = time.Now().UnixMilli()
 
 			// Publish to recipient's channel
 			s.publishMessage(ctx, &chatMsg)

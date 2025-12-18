@@ -8,12 +8,13 @@ import (
 
 // ChatMessage represents a chat message
 type ChatMessage struct {
-	ID        string    `json:"id,omitempty"`
-	Sender    string    `json:"sender"`
-	Recipient string    `json:"recipient"`
-	Content   string    `json:"content"`
-	Type      string    `json:"type,omitempty"` // "text", "image", "file"
-	CreatedAt time.Time `json:"created_at"`
+	ID         string `json:"id,omitempty"`
+	Sender     string `json:"sender"`
+	Recipient  string `json:"recipient"`
+	Content    string `json:"content"`
+	Type       string `json:"type,omitempty"` // "text", "image", "file"
+	SentAt     int64  `json:"sent_at"`        // Unix timestamp ms
+	ReceivedAt *int64 `json:"received_at"`    // Unix timestamp ms (nil if not received yet)
 }
 
 // NewChatMessage creates a new chat message with current timestamp
@@ -23,15 +24,25 @@ func NewChatMessage(sender, recipient, content string) *ChatMessage {
 		Recipient: recipient,
 		Content:   content,
 		Type:      "text",
-		CreatedAt: time.Now(),
+		SentAt:    time.Now().UnixMilli(),
 	}
+}
+
+// MarkReceived sets the received timestamp
+func (m *ChatMessage) MarkReceived() {
+	now := time.Now().UnixMilli()
+	m.ReceivedAt = &now
 }
 
 // String returns a string representation of the message
 func (m ChatMessage) String() string {
+	receivedStr := "nil"
+	if m.ReceivedAt != nil {
+		receivedStr = fmt.Sprintf("%d", *m.ReceivedAt)
+	}
 	return fmt.Sprintf(
-		"{sender: %s, recipient: %s, content: %s, created: %s}",
-		m.Sender, m.Recipient, m.Content, m.CreatedAt.Format(time.RFC3339),
+		"{sender: %s, recipient: %s, content: %s, sent_at: %d, received_at: %s}",
+		m.Sender, m.Recipient, m.Content, m.SentAt, receivedStr,
 	)
 }
 
