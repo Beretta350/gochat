@@ -1,0 +1,48 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  default: standard
+  enable:
+    - misspell
+    - unconvert
+    - gosec
+    - bodyclose
+    - gocritic
+  exclusions:
+    rules:
+      # Ignore errcheck in tests
+      - path: _test\.go
+        linters:
+          - errcheck
+      # Ignore gosec in tests
+      - path: _test\.go
+        linters:
+          - gosec
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/Beretta350/gochat
+  exclusions:
+    paths:
+      - _test\.go
+
+linters-settings:
+  misspell:
+    locale: US
+  gosec:
+    excludes:
+      - G104
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance

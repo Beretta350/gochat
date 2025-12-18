@@ -7,12 +7,9 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/Beretta350/gochat/internal/app/adapters/wsadapter"
 	"github.com/Beretta350/gochat/pkg/envutil"
-	consumerfactory "github.com/Beretta350/gochat/pkg/kafkafactory/consumer"
-	producerfactory "github.com/Beretta350/gochat/pkg/kafkafactory/producer"
-	topicmanager "github.com/Beretta350/gochat/pkg/kafkafactory/topic"
 	"github.com/Beretta350/gochat/pkg/logger"
+	"github.com/Beretta350/gochat/pkg/redisclient"
 )
 
 var (
@@ -23,7 +20,7 @@ var (
 )
 
 func init() {
-	env := envutil.GetEnv("ENV", "dev") // Default to "dev"
+	env := envutil.GetEnv("ENV", "dev")
 	if env == "local" {
 		configPath := filepath.Join(configsDir, "local.env")
 		if err := godotenv.Load(configPath); err != nil {
@@ -31,27 +28,31 @@ func init() {
 		}
 	}
 
-	kafkaBrokers := envutil.GetEnv("KAFKA_BROKER", "kafka:9092")
-
-	// Setup logger before all
+	// Setup logger
 	logger.Init(env)
 
-	// Setup Kafka components
-	topicmanager.Init(kafkaBrokers)    // Admin client for topic management
-	producerfactory.Init(kafkaBrokers) // Producer initialization
-	consumerfactory.Init(kafkaBrokers) // Consumer initialization
+	// Setup Redis
+	redisConfig := redisclient.Config{
+		Addr:     envutil.GetEnv("REDIS_ADDR", "localhost:6379"),
+		Password: envutil.GetEnv("REDIS_PASSWORD", ""),
+		DB:       envutil.GetEnvInt("REDIS_DB", 0),
+	}
+	if err := redisclient.Init(redisConfig); err != nil {
+		logger.Fatalf("Failed to connect to Redis: %v", err)
+	}
 
+	// Setup application
 	setupApplication(env)
 
 	logger.Info("Configuration successfully setup!")
 }
 
-var once sync.Once
-var instance *Config
+var appOnce sync.Once
+var appInstance *AppConfig
 
-type Config struct {
-	Server   *ServerConfig
-	Upgrader wsadapter.Upgrader
+type AppConfig struct {
+	Server *ServerConfig
+	Env    string
 }
 
 // ServerConfig holds the server configuration
@@ -59,30 +60,24 @@ type ServerConfig struct {
 	Port string
 }
 
-func setupApplication(env string) *Config {
-	once.Do(func() {
+func setupApplication(env string) *AppConfig {
+	appOnce.Do(func() {
 		serverConfig := &ServerConfig{
 			Port: envutil.GetEnv("SERVER_PORT", "8080"),
 		}
 
-		var upgrader wsadapter.Upgrader
-		if env != "prod" {
-			upgrader = wsadapter.NewUpgrader(
-				envutil.GetEnvInt("WS_READ_BUFFER_SIZE", 1024),
-				envutil.GetEnvInt("WS_WRITE_BUFFER_SIZE", 1024),
-				envutil.GetEnvBool("WS_CHECK_ORIGIN", true),
-			)
+		appInstance = &AppConfig{
+			Server: serverConfig,
+			Env:    env,
 		}
-
-		instance = &Config{Server: serverConfig, Upgrader: upgrader}
 	})
-	return instance
+	return appInstance
 }
 
 func GetServerConfig() *ServerConfig {
-	return instance.Server
+	return appInstance.Server
 }
 
-func GetWebsocketUpgrader() wsadapter.Upgrader {
-	return instance.Upgrader
+func GetEnv() string {
+	return appInstance.Env
 }

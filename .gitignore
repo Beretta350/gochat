@@ -36,3 +36,16 @@ go.work.sum
 .vscode/
 .idea/
 
+# Build artifacts
+/bin/
+/tmp/
+
+# Coverage
+coverage.out
+coverage.html
+
+# Air (hot reload)
+build-errors.log
+
+# OS files
+.DS_Store
