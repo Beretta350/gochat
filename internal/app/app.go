@@ -6,20 +6,20 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
 
 	"github.com/Beretta350/gochat/internal/app/chat"
+	"github.com/Beretta350/gochat/internal/app/handler"
+	"github.com/Beretta350/gochat/internal/app/middleware"
 	"github.com/Beretta350/gochat/internal/app/repository"
+	"github.com/Beretta350/gochat/internal/app/router"
 	"github.com/Beretta350/gochat/internal/app/worker"
 	"github.com/Beretta350/gochat/internal/config"
-	applogger "github.com/Beretta350/gochat/pkg/logger"
+	"github.com/Beretta350/gochat/pkg/logger"
 	"github.com/Beretta350/gochat/pkg/redisclient"
 )
 
+// Run starts the application
 func Run() {
 	serverConfig := config.GetServerConfig()
 
@@ -30,69 +30,48 @@ func Run() {
 	// Handle shutdown signals
 	go handleShutdown(cancel)
 
-	// Create repository (in-memory for now, will be Postgres later)
+	// Initialize services
 	messageRepo := repository.NewInMemoryMessageRepository()
+	chatService := chat.NewService()
 
-	// Start message worker (processes stream and saves to DB)
+	// Start message worker
 	messageWorker := worker.NewMessageWorker(messageRepo, "worker-1")
 	go messageWorker.Start(ctx)
 
-	// Create chat service
-	chatService := chat.NewService()
-
-	// Create Fiber app
+	// Create Fiber app with custom error handler
 	app := fiber.New(fiber.Config{
-		AppName: "GoChat API v1.0",
+		AppName:      "GoChat API v1.0",
+		ErrorHandler: middleware.CustomErrorHandler,
 	})
 
-	// Middlewares
-	app.Use(recover.New())
-	app.Use(logger.New())
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-	}))
+	// Setup middlewares (recover, requestid, logger, helmet, cors, rate limiter)
+	middleware.Setup(app)
 
-	// Health check
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status":  "ok",
-			"message": "GoChat API is running",
-		})
+	// Initialize handlers
+	healthHandler := handler.NewHealthHandler()
+	wsHandler := handler.NewWebSocketHandler(ctx, chatService)
+
+	// Setup routes
+	router.Setup(app, &router.Config{
+		HealthHandler:    healthHandler,
+		WebSocketHandler: wsHandler,
 	})
 
-	// WebSocket upgrade middleware
-	app.Use("/ws", func(c *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) {
-			return c.Next()
-		}
-		return fiber.ErrUpgradeRequired
-	})
-
-	// WebSocket route
-	app.Get("/ws", websocket.New(func(c *websocket.Conn) {
-		userToken := c.Query("token")
-		if userToken == "" {
-			applogger.Error("Missing user token")
-			_ = c.Close()
-			return
-		}
-
-		// Handle the WebSocket connection
-		chatService.HandleConnection(ctx, c, userToken)
-	}))
-
-	// Graceful shutdown
+	// Graceful shutdown hook
 	app.Hooks().OnShutdown(func() error {
-		applogger.Info("Shutting down...")
-		cancel() // Cancel context to stop workers
+		logger.Info("Shutting down gracefully...")
+		cancel()
 		return redisclient.Close()
 	})
 
 	// Start server
-	applogger.Infof("🚀 Fiber server starting on port %s", serverConfig.Port)
+	logger.Infof("🚀 GoChat server starting on port %s", serverConfig.Port)
+	logger.Info("📊 Metrics available at /metrics")
+	logger.Info("🔌 WebSocket endpoint: /ws?token=<user_token>")
+	logger.Info("❤️  Health check: /api/v1/health")
+
 	if err := app.Listen(":" + serverConfig.Port); err != nil {
-		applogger.Fatal("Failed to start server:", err)
+		logger.Fatal("Failed to start server:", err)
 	}
 }
 
@@ -100,6 +79,6 @@ func handleShutdown(cancel context.CancelFunc) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
-	applogger.Info("Shutdown signal received")
+	logger.Info("Shutdown signal received")
 	cancel()
 }
