@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/Beretta350/gochat/internal/app/model"
 	"github.com/Beretta350/gochat/internal/app/repository"
 	"github.com/Beretta350/gochat/pkg/logger"
@@ -18,8 +20,9 @@ const (
 	batchTimeout  = time.Second * 2
 )
 
-// MessageWorker processes messages from Redis Stream and saves to database
+// MessageWorker processes messages from Redis Stream
 type MessageWorker struct {
+	redis      *redisclient.Client
 	repo       repository.MessageRepository
 	workerID   string
 	batchSize  int
@@ -28,11 +31,13 @@ type MessageWorker struct {
 	lastFlush  time.Time
 }
 
-// NewMessageWorker creates a new message worker
-func NewMessageWorker(repo repository.MessageRepository, workerID string) *MessageWorker {
+// NewMessageWorker creates a new message worker (Fx provider)
+func NewMessageWorker(redis *redisclient.Client, repo repository.MessageRepository) *MessageWorker {
+	logger.Info("Message worker initialized")
 	return &MessageWorker{
+		redis:     redis,
 		repo:      repo,
-		workerID:  workerID,
+		workerID:  "worker-1",
 		batchSize: batchSize,
 		buffer:    make([]*model.ChatMessage, 0, batchSize),
 		lastFlush: time.Now(),
@@ -41,21 +46,18 @@ func NewMessageWorker(repo repository.MessageRepository, workerID string) *Messa
 
 // Start starts the worker
 func (w *MessageWorker) Start(ctx context.Context) {
-	// Create consumer group if not exists
-	if err := redisclient.CreateConsumerGroup(ctx, consumerGroup); err != nil {
+	if err := w.redis.CreateConsumerGroup(ctx, consumerGroup); err != nil {
 		logger.Errorf("Failed to create consumer group: %v", err)
 	}
 
 	logger.Infof("Message worker %s started", w.workerID)
 
-	// Start flush ticker
 	go w.flushTicker(ctx)
 
-	// Process messages
 	for {
 		select {
 		case <-ctx.Done():
-			w.flush(ctx) // Final flush before shutdown
+			w.flush(ctx)
 			logger.Infof("Message worker %s stopped", w.workerID)
 			return
 		default:
@@ -65,28 +67,30 @@ func (w *MessageWorker) Start(ctx context.Context) {
 }
 
 func (w *MessageWorker) processMessages(ctx context.Context) {
-	messages, err := redisclient.ReadStreamGroup(ctx, consumerGroup, w.workerID, int64(w.batchSize), time.Second)
+	streams, err := w.redis.ReadStreamGroup(ctx, consumerGroup, w.workerID, int64(w.batchSize), time.Second)
 	if err != nil {
-		logger.Errorf("Error reading from stream: %v", err)
+		if err != redis.Nil {
+			logger.Errorf("Error reading from stream: %v", err)
+		}
 		time.Sleep(time.Second)
 		return
 	}
 
-	for _, msg := range messages {
-		chatMsg := w.parseMessage(msg.Values)
-		if chatMsg != nil {
-			w.addToBuffer(ctx, chatMsg)
-		}
+	for _, stream := range streams {
+		for _, msg := range stream.Messages {
+			chatMsg := w.parseMessage(msg.Values)
+			if chatMsg != nil {
+				w.addToBuffer(ctx, chatMsg)
+			}
 
-		// Acknowledge message
-		if err := redisclient.AckMessage(ctx, consumerGroup, msg.ID); err != nil {
-			logger.Errorf("Error acknowledging message %s: %v", msg.ID, err)
+			if err := w.redis.AckMessage(ctx, consumerGroup, msg.ID); err != nil {
+				logger.Errorf("Error acknowledging message %s: %v", msg.ID, err)
+			}
 		}
 	}
 }
 
 func (w *MessageWorker) parseMessage(values map[string]interface{}) *model.ChatMessage {
-	// Parse from stream values
 	msgJSON, ok := values["data"].(string)
 	if !ok {
 		return nil
@@ -107,7 +111,6 @@ func (w *MessageWorker) addToBuffer(ctx context.Context, msg *model.ChatMessage)
 
 	w.buffer = append(w.buffer, msg)
 
-	// Flush if buffer is full
 	if len(w.buffer) >= w.batchSize {
 		w.flushLocked(ctx)
 	}
@@ -138,15 +141,13 @@ func (w *MessageWorker) flushLocked(ctx context.Context) {
 		return
 	}
 
-	// Save batch to repository (will be Postgres later)
 	if err := w.repo.SaveBatch(ctx, w.buffer); err != nil {
 		logger.Errorf("Error saving batch: %v", err)
 		return
 	}
 
-	logger.Infof("Worker %s flushed %d messages to storage", w.workerID, len(w.buffer))
+	logger.Infof("Worker %s flushed %d messages", w.workerID, len(w.buffer))
 
-	// Clear buffer
 	w.buffer = make([]*model.ChatMessage, 0, w.batchSize)
 	w.lastFlush = time.Now()
 }

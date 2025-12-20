@@ -13,14 +13,13 @@ import (
 // WebSocketHandler handles WebSocket connections
 type WebSocketHandler struct {
 	chatService *chat.Service
-	ctx         context.Context
 }
 
-// NewWebSocketHandler creates a new WebSocket handler
-func NewWebSocketHandler(ctx context.Context, chatService *chat.Service) *WebSocketHandler {
+// NewWebSocketHandler creates a new WebSocket handler (Fx provider)
+func NewWebSocketHandler(chatService *chat.Service) *WebSocketHandler {
+	logger.Info("WebSocket handler initialized")
 	return &WebSocketHandler{
 		chatService: chatService,
-		ctx:         ctx,
 	}
 }
 
@@ -33,16 +32,18 @@ func (h *WebSocketHandler) Upgrade(c *fiber.Ctx) error {
 }
 
 // Handle handles WebSocket connections
-func (h *WebSocketHandler) Handle(c *websocket.Conn) {
-	userToken := c.Query("token")
-	if userToken == "" {
-		logger.Error("Missing user token")
-		_ = c.Close()
-		return
+func (h *WebSocketHandler) Handle(ctx context.Context) func(*websocket.Conn) {
+	return func(c *websocket.Conn) {
+		userToken := c.Query("token")
+		if userToken == "" {
+			logger.Error("Missing user token")
+			_ = c.Close()
+			return
+		}
+
+		requestID := c.Query("request_id", "unknown")
+		logger.Infof("[%s] WebSocket connection: %s", requestID, userToken)
+
+		h.chatService.HandleConnection(ctx, c, userToken)
 	}
-
-	requestID := c.Query("request_id", "unknown")
-	logger.Infof("[%s] WebSocket connection from user: %s", requestID, userToken)
-
-	h.chatService.HandleConnection(h.ctx, c, userToken)
 }

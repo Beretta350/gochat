@@ -8,7 +8,8 @@ Real-time chat application built with Go, Fiber, Redis Pub/Sub, and WebSocket.
 |------------|---------|
 | **Go 1.23** | Backend language |
 | **Fiber v2** | Web framework |
-| **Redis** | Pub/Sub for real-time messaging |
+| **Uber Fx** | Dependency injection |
+| **Redis** | Pub/Sub & Streams for messaging |
 | **WebSocket** | Real-time communication |
 | **Docker** | Containerization |
 
@@ -17,26 +18,38 @@ Real-time chat application built with Go, Fiber, Redis Pub/Sub, and WebSocket.
 ```
 gochat-backend/
 ├── cmd/
-│   └── main.go              # Application entrypoint
+│   └── main.go                  # Application entrypoint
 ├── internal/
 │   ├── app/
-│   │   ├── app.go           # Fiber app setup
+│   │   ├── app.go               # Fiber app with Fx lifecycle
+│   │   ├── fx/
+│   │   │   └── module.go        # Fx dependency module
 │   │   ├── chat/
-│   │   │   └── service.go   # Chat service with Redis Pub/Sub
-│   │   └── model/
-│   │       └── chat_message_model.go
+│   │   │   └── service.go       # Chat service with Redis Pub/Sub
+│   │   ├── handler/
+│   │   │   ├── health.go        # Health check handler
+│   │   │   └── websocket.go     # WebSocket handler
+│   │   ├── middleware/
+│   │   │   ├── error_handler.go # Custom error handler
+│   │   │   └── middlewares.go   # Fiber middlewares setup
+│   │   ├── model/
+│   │   │   └── chat_message_model.go
+│   │   ├── repository/
+│   │   │   └── message_repository.go  # Message persistence
+│   │   └── worker/
+│   │       └── message_worker.go      # Redis Stream consumer
 │   └── config/
-│       └── config.go        # Configuration management
+│       └── config.go            # Configuration (Fx provider)
 ├── pkg/
-│   ├── envutil/             # Environment utilities
-│   ├── logger/              # Zap logger wrapper
-│   └── redisclient/         # Redis client
+│   ├── envutil/                 # Environment utilities
+│   ├── logger/                  # Zap logger wrapper
+│   └── redisclient/             # Redis client (Fx provider)
 ├── configs/
-│   └── local.env            # Local environment variables
-├── docker-compose.yml       # Redis container
-├── Makefile                 # Build and dev commands
-├── .air.toml                # Hot reload config
-└── .golangci.yml            # Linter config
+│   └── local.env                # Local environment variables
+├── docker-compose.yml           # Redis container
+├── Makefile                     # Build and dev commands
+├── .air.toml                    # Hot reload config
+└── .golangci.yml                # Linter config
 ```
 
 ## 🛠️ Getting Started
@@ -82,7 +95,14 @@ make dev
 ### Health Check
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8080/api/v1/health
+```
+
+### Metrics Dashboard
+
+```bash
+# Open in browser
+http://localhost:8080/metrics
 ```
 
 ### WebSocket Connection
@@ -137,16 +157,34 @@ make all            # fmt + lint + test + build
 
 ## 🏗️ Architecture
 
+### Dependency Injection (Uber Fx)
+
+The application uses **Uber Fx** for dependency injection, providing:
+- Automatic dependency resolution
+- Clean lifecycle management (start/stop hooks)
+- Testability through constructor injection
+
+```
+Config → RedisClient → ChatService → WebSocketHandler
+                    ↘               ↗
+              MessageRepository → MessageWorker
+```
+
+### System Overview
+
 ```
 ┌─────────┐     WebSocket      ┌─────────────┐
 │ Client  │◄──────────────────►│   Fiber     │
 └─────────┘                    │   Server    │
                                └──────┬──────┘
                                       │
-                               ┌──────▼──────┐
-                               │    Redis    │
-                               │   Pub/Sub   │
-                               └─────────────┘
+                         ┌────────────┼────────────┐
+                         ▼            ▼            ▼
+                   ┌──────────┐ ┌──────────┐ ┌──────────┐
+                   │  Pub/Sub │ │  Stream  │ │  Lists   │
+                   │(realtime)│ │(persist) │ │(pending) │
+                   └──────────┘ └──────────┘ └──────────┘
+                               Redis
 ```
 
 ### Message Flow
@@ -154,8 +192,10 @@ make all            # fmt + lint + test + build
 1. User A connects via WebSocket with `?token=alice`
 2. Server subscribes to Redis channel `user:alice`
 3. User A sends message to User B
-4. Server publishes to Redis channel `user:bob`
-5. User B's server receives and forwards via WebSocket
+4. Message is added to Redis Stream (for persistence worker)
+5. If User B is **online**: publish to Redis channel `user:bob`
+6. If User B is **offline**: add to pending queue `pending:bob`
+7. When User B connects, pending messages are delivered first
 
 ## 📝 TODO
 

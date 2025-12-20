@@ -2,83 +2,95 @@ package app
 
 import (
 	"context"
-	"os"
-	"os/signal"
-	"syscall"
 
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/monitor"
+	"go.uber.org/fx"
 
-	"github.com/Beretta350/gochat/internal/app/chat"
+	appfx "github.com/Beretta350/gochat/internal/app/fx"
 	"github.com/Beretta350/gochat/internal/app/handler"
 	"github.com/Beretta350/gochat/internal/app/middleware"
-	"github.com/Beretta350/gochat/internal/app/repository"
-	"github.com/Beretta350/gochat/internal/app/router"
 	"github.com/Beretta350/gochat/internal/app/worker"
 	"github.com/Beretta350/gochat/internal/config"
 	"github.com/Beretta350/gochat/pkg/logger"
 	"github.com/Beretta350/gochat/pkg/redisclient"
 )
 
-// Run starts the application
+// Run starts the application with Fx dependency injection
 func Run() {
-	serverConfig := config.GetServerConfig()
+	fx.New(
+		// Provide all dependencies
+		appfx.Module,
 
-	// Create context that cancels on shutdown signals
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+		// Invoke the server
+		fx.Invoke(startServer),
+	).Run()
+}
 
-	// Handle shutdown signals
-	go handleShutdown(cancel)
+// ServerParams holds all dependencies needed to start the server
+type ServerParams struct {
+	fx.In
 
-	// Initialize services
-	messageRepo := repository.NewInMemoryMessageRepository()
-	chatService := chat.NewService()
+	Lifecycle fx.Lifecycle
+	Config    *config.Config
+	Redis     *redisclient.Client
+	Health    *handler.HealthHandler
+	WebSocket *handler.WebSocketHandler
+	Worker    *worker.MessageWorker
+}
 
-	// Start message worker
-	messageWorker := worker.NewMessageWorker(messageRepo, "worker-1")
-	go messageWorker.Start(ctx)
-
-	// Create Fiber app with custom error handler
+func startServer(p ServerParams) {
 	app := fiber.New(fiber.Config{
 		AppName:      "GoChat API v1.0",
 		ErrorHandler: middleware.CustomErrorHandler,
 	})
 
-	// Setup middlewares (recover, requestid, logger, helmet, cors, rate limiter)
+	// Setup middlewares
 	middleware.Setup(app)
 
-	// Initialize handlers
-	healthHandler := handler.NewHealthHandler()
-	wsHandler := handler.NewWebSocketHandler(ctx, chatService)
-
 	// Setup routes
-	router.Setup(app, &router.Config{
-		HealthHandler:    healthHandler,
-		WebSocketHandler: wsHandler,
+	setupRoutes(app, p)
+
+	p.Lifecycle.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			logger.Infof("🚀 Starting GoChat on port %s", p.Config.Server.Port)
+			logger.Info("📊 Metrics: /metrics")
+			logger.Info("🔌 WebSocket: /ws?token=<user>")
+			logger.Info("❤️  Health: /api/v1/health")
+
+			// Start worker in background
+			go p.Worker.Start(ctx)
+
+			// Start server in background
+			go func() {
+				if err := app.Listen(":" + p.Config.Server.Port); err != nil {
+					logger.Errorf("Server error: %v", err)
+				}
+			}()
+
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			logger.Info("Shutting down...")
+			_ = p.Redis.Close()
+			return app.Shutdown()
+		},
 	})
-
-	// Graceful shutdown hook
-	app.Hooks().OnShutdown(func() error {
-		logger.Info("Shutting down gracefully...")
-		cancel()
-		return redisclient.Close()
-	})
-
-	// Start server
-	logger.Infof("🚀 GoChat server starting on port %s", serverConfig.Port)
-	logger.Info("📊 Metrics available at /metrics")
-	logger.Info("🔌 WebSocket endpoint: /ws?token=<user_token>")
-	logger.Info("❤️  Health check: /api/v1/health")
-
-	if err := app.Listen(":" + serverConfig.Port); err != nil {
-		logger.Fatal("Failed to start server:", err)
-	}
 }
 
-func handleShutdown(cancel context.CancelFunc) {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
-	logger.Info("Shutdown signal received")
-	cancel()
+func setupRoutes(app *fiber.App, p ServerParams) {
+	// API routes
+	api := app.Group("/api/v1")
+	api.Get("/health", p.Health.Check)
+
+	// WebSocket routes
+	ws := app.Group("/ws")
+	ws.Use(p.WebSocket.Upgrade)
+	ws.Get("/", websocket.New(p.WebSocket.Handle(context.Background())))
+
+	// Monitoring
+	app.Get("/metrics", monitor.New(monitor.Config{
+		Title: "GoChat Metrics",
+	}))
 }

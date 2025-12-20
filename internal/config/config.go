@@ -3,13 +3,11 @@ package config
 import (
 	"path/filepath"
 	"runtime"
-	"sync"
 
 	"github.com/joho/godotenv"
 
 	"github.com/Beretta350/gochat/pkg/envutil"
 	"github.com/Beretta350/gochat/pkg/logger"
-	"github.com/Beretta350/gochat/pkg/redisclient"
 )
 
 var (
@@ -19,40 +17,11 @@ var (
 	configsDir  = filepath.Join(projectRoot, "configs")
 )
 
-func init() {
-	env := envutil.GetEnv("ENV", "dev")
-	if env == "local" {
-		configPath := filepath.Join(configsDir, "local.env")
-		if err := godotenv.Load(configPath); err != nil {
-			panic(err)
-		}
-	}
-
-	// Setup logger
-	logger.Init(env)
-
-	// Setup Redis
-	redisConfig := redisclient.Config{
-		Addr:     envutil.GetEnv("REDIS_ADDR", "localhost:6379"),
-		Password: envutil.GetEnv("REDIS_PASSWORD", ""),
-		DB:       envutil.GetEnvInt("REDIS_DB", 0),
-	}
-	if err := redisclient.Init(redisConfig); err != nil {
-		logger.Fatalf("Failed to connect to Redis: %v", err)
-	}
-
-	// Setup application
-	setupApplication(env)
-
-	logger.Info("Configuration successfully setup!")
-}
-
-var appOnce sync.Once
-var appInstance *AppConfig
-
-type AppConfig struct {
-	Server *ServerConfig
+// Config holds all application configuration
+type Config struct {
 	Env    string
+	Server ServerConfig
+	Redis  RedisConfig
 }
 
 // ServerConfig holds the server configuration
@@ -60,24 +29,40 @@ type ServerConfig struct {
 	Port string
 }
 
-func setupApplication(env string) *AppConfig {
-	appOnce.Do(func() {
-		serverConfig := &ServerConfig{
+// RedisConfig holds Redis configuration
+type RedisConfig struct {
+	Addr     string
+	Password string
+	DB       int
+}
+
+// NewConfig creates a new Config (Fx provider)
+func NewConfig() (*Config, error) {
+	env := envutil.GetEnv("ENV", "dev")
+
+	// Load .env file for local environment
+	if env == "local" {
+		configPath := filepath.Join(configsDir, "local.env")
+		if err := godotenv.Load(configPath); err != nil {
+			return nil, err
+		}
+	}
+
+	// Initialize logger
+	logger.Init(env)
+
+	cfg := &Config{
+		Env: env,
+		Server: ServerConfig{
 			Port: envutil.GetEnv("SERVER_PORT", "8080"),
-		}
+		},
+		Redis: RedisConfig{
+			Addr:     envutil.GetEnv("REDIS_ADDR", "localhost:6379"),
+			Password: envutil.GetEnv("REDIS_PASSWORD", ""),
+			DB:       envutil.GetEnvInt("REDIS_DB", 0),
+		},
+	}
 
-		appInstance = &AppConfig{
-			Server: serverConfig,
-			Env:    env,
-		}
-	})
-	return appInstance
-}
-
-func GetServerConfig() *ServerConfig {
-	return appInstance.Server
-}
-
-func GetEnv() string {
-	return appInstance.Env
+	logger.Info("Configuration loaded")
+	return cfg, nil
 }
