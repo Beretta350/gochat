@@ -2,56 +2,56 @@ package repository
 
 import (
 	"context"
+	"sync"
 
 	"github.com/Beretta350/gochat/internal/app/model"
+	"github.com/Beretta350/gochat/pkg/logger"
 )
 
 // MessageRepository defines the interface for message persistence
-// This will be implemented by PostgreSQL later
 type MessageRepository interface {
-	// Save persists a single message
 	Save(ctx context.Context, msg *model.ChatMessage) error
-
-	// SaveBatch persists multiple messages at once (for performance)
 	SaveBatch(ctx context.Context, msgs []*model.ChatMessage) error
-
-	// GetConversation retrieves messages between two users with pagination
 	GetConversation(ctx context.Context, user1, user2 string, limit, offset int) ([]*model.ChatMessage, error)
-
-	// GetUndelivered retrieves all undelivered messages for a user
 	GetUndelivered(ctx context.Context, userID string) ([]*model.ChatMessage, error)
-
-	// MarkAsDelivered marks a message as delivered
 	MarkAsDelivered(ctx context.Context, messageID string) error
-
-	// MarkAsRead marks a message as read
 	MarkAsRead(ctx context.Context, messageID string) error
 }
 
 // InMemoryMessageRepository is a temporary in-memory implementation
-// Will be replaced by PostgresMessageRepository
 type InMemoryMessageRepository struct {
 	messages []*model.ChatMessage
+	mu       sync.RWMutex
 }
 
-// NewInMemoryMessageRepository creates a new in-memory repository
-func NewInMemoryMessageRepository() MessageRepository {
+// NewMessageRepository creates a new message repository (Fx provider)
+// Currently returns in-memory, will return Postgres later
+func NewMessageRepository() MessageRepository {
+	logger.Info("Message repository initialized (in-memory)")
 	return &InMemoryMessageRepository{
 		messages: make([]*model.ChatMessage, 0),
 	}
 }
 
 func (r *InMemoryMessageRepository) Save(ctx context.Context, msg *model.ChatMessage) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.messages = append(r.messages, msg)
 	return nil
 }
 
 func (r *InMemoryMessageRepository) SaveBatch(ctx context.Context, msgs []*model.ChatMessage) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.messages = append(r.messages, msgs...)
+	logger.Infof("Saved batch of %d messages", len(msgs))
 	return nil
 }
 
 func (r *InMemoryMessageRepository) GetConversation(ctx context.Context, user1, user2 string, limit, offset int) ([]*model.ChatMessage, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	var result []*model.ChatMessage
 	for _, msg := range r.messages {
 		if (msg.Sender == user1 && msg.Recipient == user2) ||
@@ -60,7 +60,6 @@ func (r *InMemoryMessageRepository) GetConversation(ctx context.Context, user1, 
 		}
 	}
 
-	// Apply pagination
 	start := offset
 	if start > len(result) {
 		return []*model.ChatMessage{}, nil
@@ -74,6 +73,9 @@ func (r *InMemoryMessageRepository) GetConversation(ctx context.Context, user1, 
 }
 
 func (r *InMemoryMessageRepository) GetUndelivered(ctx context.Context, userID string) ([]*model.ChatMessage, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	var result []*model.ChatMessage
 	for _, msg := range r.messages {
 		if msg.Recipient == userID && msg.ReceivedAt == nil {
@@ -84,11 +86,9 @@ func (r *InMemoryMessageRepository) GetUndelivered(ctx context.Context, userID s
 }
 
 func (r *InMemoryMessageRepository) MarkAsDelivered(ctx context.Context, messageID string) error {
-	// In-memory: no-op for now
 	return nil
 }
 
 func (r *InMemoryMessageRepository) MarkAsRead(ctx context.Context, messageID string) error {
-	// In-memory: no-op for now
 	return nil
 }
