@@ -20,13 +20,13 @@ const (
 	batchTimeout  = time.Second * 2
 )
 
-// MessageWorker processes messages from Redis Stream
+// MessageWorker processes messages from Redis Stream and persists to PostgreSQL
 type MessageWorker struct {
 	redis      *redisclient.Client
 	repo       repository.MessageRepository
 	workerID   string
 	batchSize  int
-	buffer     []*model.ChatMessage
+	buffer     []*model.Message
 	bufferLock sync.Mutex
 	lastFlush  time.Time
 }
@@ -39,7 +39,7 @@ func NewMessageWorker(redis *redisclient.Client, repo repository.MessageReposito
 		repo:      repo,
 		workerID:  "worker-1",
 		batchSize: batchSize,
-		buffer:    make([]*model.ChatMessage, 0, batchSize),
+		buffer:    make([]*model.Message, 0, batchSize),
 		lastFlush: time.Now(),
 	}
 }
@@ -78,9 +78,9 @@ func (w *MessageWorker) processMessages(ctx context.Context) {
 
 	for _, stream := range streams {
 		for _, msg := range stream.Messages {
-			chatMsg := w.parseMessage(msg.Values)
-			if chatMsg != nil {
-				w.addToBuffer(ctx, chatMsg)
+			message := w.parseMessage(msg.Values)
+			if message != nil {
+				w.addToBuffer(ctx, message)
 			}
 
 			if err := w.redis.AckMessage(ctx, consumerGroup, msg.ID); err != nil {
@@ -90,22 +90,48 @@ func (w *MessageWorker) processMessages(ctx context.Context) {
 	}
 }
 
-func (w *MessageWorker) parseMessage(values map[string]interface{}) *model.ChatMessage {
+func (w *MessageWorker) parseMessage(values map[string]interface{}) *model.Message {
 	msgJSON, ok := values["data"].(string)
 	if !ok {
 		return nil
 	}
 
-	var msg model.ChatMessage
-	if err := json.Unmarshal([]byte(msgJSON), &msg); err != nil {
+	// Parse the WebSocket message format
+	var wsMsg struct {
+		ID             string `json:"id"`
+		ConversationID string `json:"conversation_id"`
+		SenderID       string `json:"sender_id"`
+		Content        string `json:"content"`
+		Type           string `json:"type"`
+		SentAt         int64  `json:"sent_at"`
+	}
+
+	if err := json.Unmarshal([]byte(msgJSON), &wsMsg); err != nil {
 		logger.Errorf("Error parsing message: %v", err)
 		return nil
 	}
 
-	return &msg
+	// Skip if no conversation_id (not ready for persistence yet)
+	if wsMsg.ConversationID == "" {
+		return nil
+	}
+
+	msgType := model.MessageType(wsMsg.Type)
+	if msgType == "" {
+		msgType = model.MessageTypeText
+	}
+
+	return &model.Message{
+		ID:             wsMsg.ID,
+		ConversationID: wsMsg.ConversationID,
+		SenderID:       wsMsg.SenderID,
+		Content:        wsMsg.Content,
+		Type:           msgType,
+		SentAt:         time.UnixMilli(wsMsg.SentAt),
+	}
 }
 
-func (w *MessageWorker) addToBuffer(ctx context.Context, msg *model.ChatMessage) {
+func (w *MessageWorker) addToBuffer(ctx context.Context, msg *model.Message) {
 	w.bufferLock.Lock()
 	defer w.bufferLock.Unlock()
 
@@ -141,13 +167,13 @@ func (w *MessageWorker) flushLocked(ctx context.Context) {
 		return
 	}
 
-	if err := w.repo.SaveBatch(ctx, w.buffer); err != nil {
+	if err := w.repo.CreateBatch(ctx, w.buffer); err != nil {
 		logger.Errorf("Error saving batch: %v", err)
 		return
 	}
 
-	logger.Infof("Worker %s flushed %d messages", w.workerID, len(w.buffer))
+	logger.Infof("Worker %s flushed %d messages to PostgreSQL", w.workerID, len(w.buffer))
 
-	w.buffer = make([]*model.ChatMessage, 0, w.batchSize)
+	w.buffer = make([]*model.Message, 0, w.batchSize)
 	w.lastFlush = time.Now()
 }

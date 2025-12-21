@@ -9,7 +9,9 @@ Real-time chat application built with Go, Fiber, Redis Pub/Sub, and WebSocket.
 | **Go 1.23** | Backend language |
 | **Fiber v2** | Web framework |
 | **Uber Fx** | Dependency injection |
-| **Redis** | Pub/Sub & Streams for messaging |
+| **PostgreSQL** | Persistent storage (users, messages) |
+| **Redis** | Pub/Sub & Streams for real-time |
+| **JWT** | Stateless authentication |
 | **WebSocket** | Real-time communication |
 | **Docker** | Containerization |
 
@@ -44,13 +46,20 @@ gochat-backend/
 │   ├── envutil/                 # Environment utilities
 │   ├── logger/                  # Zap logger wrapper
 │   └── redisclient/             # Redis client (Fx provider)
+├── database/
+│   ├── schema.sql               # Complete database schema
+│   └── migrations/              # Versioned SQL migrations
+├── docs/
+│   └── DATABASE.md              # Database documentation
 ├── configs/
 │   └── local.env                # Local environment variables
-├── docker-compose.yml           # Redis container
+├── docker-compose.yml           # Redis + PostgreSQL containers
 ├── Makefile                     # Build and dev commands
 ├── .air.toml                    # Hot reload config
 └── .golangci.yml                # Linter config
 ```
+
+> 📖 See [docs/DATABASE.md](docs/DATABASE.md) for complete database documentation.
 
 ## 🛠️ Getting Started
 
@@ -86,9 +95,13 @@ make dev
 |----------|---------|-------------|
 | `ENV` | `dev` | Environment (local, dev, prod) |
 | `SERVER_PORT` | `8080` | Server port |
+| `DATABASE_URL` | | PostgreSQL connection string |
 | `REDIS_ADDR` | `localhost:6379` | Redis address |
 | `REDIS_PASSWORD` | `` | Redis password |
 | `REDIS_DB` | `0` | Redis database |
+| `JWT_SECRET` | | Secret key for JWT signing |
+| `JWT_ACCESS_EXPIRY` | `15m` | Access token expiration |
+| `JWT_REFRESH_EXPIRY` | `168h` | Refresh token expiration (7 days) |
 
 ## 📡 API
 
@@ -173,38 +186,108 @@ Config → RedisClient → ChatService → WebSocketHandler
 ### System Overview
 
 ```
-┌─────────┐     WebSocket      ┌─────────────┐
-│ Client  │◄──────────────────►│   Fiber     │
-└─────────┘                    │   Server    │
-                               └──────┬──────┘
-                                      │
-                         ┌────────────┼────────────┐
-                         ▼            ▼            ▼
-                   ┌──────────┐ ┌──────────┐ ┌──────────┐
-                   │  Pub/Sub │ │  Stream  │ │  Lists   │
-                   │(realtime)│ │(persist) │ │(pending) │
-                   └──────────┘ └──────────┘ └──────────┘
-                               Redis
+┌──────────────┐                      ┌──────────────────────────────────┐
+│   Clients    │                      │            Server                │
+│              │     WebSocket        │                                  │
+│  ┌────────┐  │◄────────────────────►│  ┌────────────────────────────┐ │
+│  │ Web/App│  │                      │  │      Fiber + Handlers      │ │
+│  └────────┘  │     REST API         │  └─────────────┬──────────────┘ │
+│  ┌────────┐  │◄────────────────────►│                │                │
+│  │ Mobile │  │                      │                ▼                │
+│  └────────┘  │                      │  ┌────────────────────────────┐ │
+└──────────────┘                      │  │      Chat Service          │ │
+                                      │  └─────────────┬──────────────┘ │
+                                      │                │                │
+                                      │    ┌───────────┼───────────┐    │
+                                      │    ▼           ▼           ▼    │
+                                      │ ┌──────┐  ┌────────┐ ┌───────┐  │
+                                      │ │Pub/Sub│  │ Stream │ │Worker │  │
+                                      │ └──┬───┘  └───┬────┘ └───┬───┘  │
+                                      └────┼──────────┼──────────┼──────┘
+                                           │          │          │
+                                           ▼          │          ▼
+                                      ┌─────────┐     │    ┌───────────┐
+                                      │  Redis  │◄────┘    │ PostgreSQL│
+                                      │(realtime)│         │ (persist) │
+                                      └─────────┘          └───────────┘
 ```
 
 ### Message Flow
 
-1. User A connects via WebSocket with `?token=alice`
-2. Server subscribes to Redis channel `user:alice`
-3. User A sends message to User B
-4. Message is added to Redis Stream (for persistence worker)
-5. If User B is **online**: publish to Redis channel `user:bob`
-6. If User B is **offline**: add to pending queue `pending:bob`
-7. When User B connects, pending messages are delivered first
+```
+Alice sends message to Bob
+           │
+           ▼
+┌─────────────────────────────┐
+│  1. Save to PostgreSQL      │ ──► Persistent storage
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│  2. Add to Redis Stream     │ ──► For async processing (optional)
+└──────────────┬──────────────┘
+               │
+               ▼
+┌─────────────────────────────┐
+│  3. Publish to Pub/Sub      │ ──► channel: user:{bob_id}
+└──────────────┬──────────────┘
+               │
+       ┌───────┴───────┐
+       ▼               ▼
+   Bob's PC       Bob's Phone
+   (online)        (online)
+       │               │
+    RECEIVES        RECEIVES
+    via WS          via WS
+
+If Bob is offline → He fetches history from PostgreSQL when reconnects
+```
+
+### Authentication Flow (JWT)
+
+```
+┌──────────┐                              ┌──────────┐
+│  Client  │                              │  Server  │
+└────┬─────┘                              └────┬─────┘
+     │                                         │
+     │  POST /auth/register                    │
+     │  { email, username, password }          │
+     │────────────────────────────────────────►│
+     │                                         │
+     │  { user }                               │
+     │◄────────────────────────────────────────│
+     │                                         │
+     │  POST /auth/login                       │
+     │  { email, password }                    │
+     │────────────────────────────────────────►│
+     │                                         │
+     │  { access_token (15min),                │
+     │    refresh_token (7d) }                 │
+     │◄────────────────────────────────────────│
+     │                                         │
+     │  WS /ws?token={access_token}            │
+     │────────────────────────────────────────►│
+     │                                         │
+     │  Connection established                 │
+     │◄═══════════════════════════════════════►│
+     │                                         │
+```
 
 ## 📝 TODO
 
-- [ ] PostgreSQL for message persistence
-- [ ] JWT Authentication
+- [x] WebSocket real-time messaging
+- [x] Redis Pub/Sub for multi-device support
+- [x] Redis Streams for async processing
+- [x] Uber Fx dependency injection
+- [x] Database schema design
+- [ ] PostgreSQL integration
+- [ ] JWT Authentication (register, login, refresh)
+- [ ] User management (CRUD)
+- [ ] Conversation management (create, list)
+- [ ] Message history with cursor pagination
 - [ ] Group chats
-- [ ] Message history
-- [ ] Read receipts
 - [ ] Typing indicators
+- [ ] Read receipts
 - [ ] File sharing
 
 ## 📄 License

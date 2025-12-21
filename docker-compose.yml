@@ -9,13 +9,35 @@ services:
     environment:
       - ENV=dev
       - SERVER_PORT=8080
+      - DATABASE_URL=postgres://gochat:gochat@postgres:5432/gochat?sslmode=disable
       - REDIS_ADDR=redis:6379
       - REDIS_PASSWORD=
       - REDIS_DB=0
+      - JWT_SECRET=your-super-secret-key-change-in-production
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: gochat-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: gochat
+      POSTGRES_PASSWORD: gochat
+      POSTGRES_DB: gochat
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gochat -d gochat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -42,4 +64,5 @@ services:
       - REDIS_HOSTS=local:redis:6379
 
 volumes:
+  postgres_data:
   redis_data:

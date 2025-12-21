@@ -8,6 +8,7 @@ import (
 	"github.com/Beretta350/gochat/internal/app/repository"
 	"github.com/Beretta350/gochat/internal/app/worker"
 	"github.com/Beretta350/gochat/internal/config"
+	"github.com/Beretta350/gochat/pkg/postgres"
 	"github.com/Beretta350/gochat/pkg/redisclient"
 )
 
@@ -15,9 +16,12 @@ import (
 var Module = fx.Options(
 	// Core
 	fx.Provide(config.NewConfig),
+	fx.Provide(postgres.NewClient),
 	fx.Provide(redisclient.NewClient),
 
-	// Repository
+	// Repositories
+	fx.Provide(repository.NewUserRepository),
+	fx.Provide(repository.NewConversationRepository),
 	fx.Provide(repository.NewMessageRepository),
 
 	// Services
