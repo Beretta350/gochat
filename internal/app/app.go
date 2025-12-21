@@ -14,6 +14,7 @@ import (
 	"github.com/Beretta350/gochat/internal/app/worker"
 	"github.com/Beretta350/gochat/internal/config"
 	"github.com/Beretta350/gochat/pkg/logger"
+	"github.com/Beretta350/gochat/pkg/postgres"
 	"github.com/Beretta350/gochat/pkg/redisclient"
 )
 
@@ -34,6 +35,7 @@ type ServerParams struct {
 
 	Lifecycle fx.Lifecycle
 	Config    *config.Config
+	Postgres  *postgres.Client
 	Redis     *redisclient.Client
 	Health    *handler.HealthHandler
 	WebSocket *handler.WebSocketHandler
@@ -56,7 +58,7 @@ func startServer(p ServerParams) {
 		OnStart: func(ctx context.Context) error {
 			logger.Infof("🚀 Starting GoChat on port %s", p.Config.Server.Port)
 			logger.Info("📊 Metrics: /metrics")
-			logger.Info("🔌 WebSocket: /ws?token=<user>")
+			logger.Info("🔌 WebSocket: /ws?token=<access_token>")
 			logger.Info("❤️  Health: /api/v1/health")
 
 			// Start worker in background
@@ -74,6 +76,7 @@ func startServer(p ServerParams) {
 		OnStop: func(ctx context.Context) error {
 			logger.Info("Shutting down...")
 			_ = p.Redis.Close()
+			p.Postgres.Close()
 			return app.Shutdown()
 		},
 	})

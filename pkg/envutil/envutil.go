@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // GetEnv gets the value of the environment variable or returns a default value
@@ -30,4 +31,16 @@ func GetEnvBool(key string, defaultValue bool) bool {
 		return boolValue
 	}
 	return defaultValue
+}
+
+func GetEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	value, exists := os.LookupEnv(key)
+	if !exists {
+		return defaultValue
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return defaultValue
+	}
+	return duration
 }

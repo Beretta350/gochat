@@ -2,93 +2,206 @@ package repository
 
 import (
 	"context"
-	"sync"
+	"errors"
+	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/Beretta350/gochat/internal/app/model"
 	"github.com/Beretta350/gochat/pkg/logger"
+	"github.com/Beretta350/gochat/pkg/postgres"
+)
+
+var (
+	ErrMessageNotFound = errors.New("message not found")
 )
 
 // MessageRepository defines the interface for message persistence
 type MessageRepository interface {
-	Save(ctx context.Context, msg *model.ChatMessage) error
-	SaveBatch(ctx context.Context, msgs []*model.ChatMessage) error
-	GetConversation(ctx context.Context, user1, user2 string, limit, offset int) ([]*model.ChatMessage, error)
-	GetUndelivered(ctx context.Context, userID string) ([]*model.ChatMessage, error)
-	MarkAsDelivered(ctx context.Context, messageID string) error
-	MarkAsRead(ctx context.Context, messageID string) error
+	Create(ctx context.Context, msg *model.Message) error
+	CreateBatch(ctx context.Context, msgs []*model.Message) error
+	GetByID(ctx context.Context, id string) (*model.Message, error)
+	GetByConversation(ctx context.Context, conversationID string, cursor *time.Time, limit int) (*model.MessagesPage, error)
 }
 
-// InMemoryMessageRepository is a temporary in-memory implementation
-type InMemoryMessageRepository struct {
-	messages []*model.ChatMessage
-	mu       sync.RWMutex
+// PostgresMessageRepository implements MessageRepository with PostgreSQL
+type PostgresMessageRepository struct {
+	db *postgres.Client
 }
 
 // NewMessageRepository creates a new message repository (Fx provider)
-// Currently returns in-memory, will return Postgres later
-func NewMessageRepository() MessageRepository {
-	logger.Info("Message repository initialized (in-memory)")
-	return &InMemoryMessageRepository{
-		messages: make([]*model.ChatMessage, 0),
+func NewMessageRepository(db *postgres.Client) MessageRepository {
+	logger.Info("Message repository initialized")
+	return &PostgresMessageRepository{db: db}
+}
+
+func (r *PostgresMessageRepository) Create(ctx context.Context, msg *model.Message) error {
+	query := `
+		INSERT INTO messages (conversation_id, sender_id, content, type, sent_at)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, created_at
+	`
+	return r.db.Pool.QueryRow(ctx, query,
+		msg.ConversationID,
+		msg.SenderID,
+		msg.Content,
+		msg.Type,
+		msg.SentAt,
+	).Scan(&msg.ID, &msg.CreatedAt)
+}
+
+func (r *PostgresMessageRepository) CreateBatch(ctx context.Context, msgs []*model.Message) error {
+	if len(msgs) == 0 {
+		return nil
 	}
-}
 
-func (r *InMemoryMessageRepository) Save(ctx context.Context, msg *model.ChatMessage) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.messages = append(r.messages, msg)
-	return nil
-}
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 
-func (r *InMemoryMessageRepository) SaveBatch(ctx context.Context, msgs []*model.ChatMessage) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.messages = append(r.messages, msgs...)
+	for _, msg := range msgs {
+		query := `
+			INSERT INTO messages (conversation_id, sender_id, content, type, sent_at)
+			VALUES ($1, $2, $3, $4, $5)
+			RETURNING id, created_at
+		`
+		err := tx.QueryRow(ctx, query,
+			msg.ConversationID,
+			msg.SenderID,
+			msg.Content,
+			msg.Type,
+			msg.SentAt,
+		).Scan(&msg.ID, &msg.CreatedAt)
+		if err != nil {
+			return err
+		}
+	}
+
 	logger.Infof("Saved batch of %d messages", len(msgs))
-	return nil
+	return tx.Commit(ctx)
 }
 
-func (r *InMemoryMessageRepository) GetConversation(ctx context.Context, user1, user2 string, limit, offset int) ([]*model.ChatMessage, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (r *PostgresMessageRepository) GetByID(ctx context.Context, id string) (*model.Message, error) {
+	query := `
+		SELECT m.id, m.conversation_id, m.sender_id, m.content, m.type, m.sent_at, m.created_at,
+		       u.id, u.email, u.username, u.is_active, u.created_at
+		FROM messages m
+		JOIN users u ON m.sender_id = u.id
+		WHERE m.id = $1
+	`
+	var msg model.Message
+	var sender model.UserResponse
 
-	var result []*model.ChatMessage
-	for _, msg := range r.messages {
-		if (msg.Sender == user1 && msg.Recipient == user2) ||
-			(msg.Sender == user2 && msg.Recipient == user1) {
-			result = append(result, msg)
+	err := r.db.Pool.QueryRow(ctx, query, id).Scan(
+		&msg.ID,
+		&msg.ConversationID,
+		&msg.SenderID,
+		&msg.Content,
+		&msg.Type,
+		&msg.SentAt,
+		&msg.CreatedAt,
+		&sender.ID,
+		&sender.Email,
+		&sender.Username,
+		&sender.IsActive,
+		&sender.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrMessageNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	msg.Sender = &sender
+	return &msg, nil
+}
+
+func (r *PostgresMessageRepository) GetByConversation(ctx context.Context, conversationID string, cursor *time.Time, limit int) (*model.MessagesPage, error) {
+	// Default limit
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	// Build query based on cursor
+	var query string
+	var args []interface{}
+
+	if cursor != nil {
+		query = `
+			SELECT m.id, m.conversation_id, m.sender_id, m.content, m.type, m.sent_at, m.created_at,
+			       u.id, u.email, u.username, u.is_active, u.created_at
+			FROM messages m
+			JOIN users u ON m.sender_id = u.id
+			WHERE m.conversation_id = $1 AND m.sent_at < $2
+			ORDER BY m.sent_at DESC
+			LIMIT $3
+		`
+		args = []interface{}{conversationID, cursor, limit + 1} // +1 to check if there are more
+	} else {
+		query = `
+			SELECT m.id, m.conversation_id, m.sender_id, m.content, m.type, m.sent_at, m.created_at,
+			       u.id, u.email, u.username, u.is_active, u.created_at
+			FROM messages m
+			JOIN users u ON m.sender_id = u.id
+			WHERE m.conversation_id = $1
+			ORDER BY m.sent_at DESC
+			LIMIT $2
+		`
+		args = []interface{}{conversationID, limit + 1}
+	}
+
+	rows, err := r.db.Pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []model.Message
+	for rows.Next() {
+		var msg model.Message
+		var sender model.UserResponse
+
+		err := rows.Scan(
+			&msg.ID,
+			&msg.ConversationID,
+			&msg.SenderID,
+			&msg.Content,
+			&msg.Type,
+			&msg.SentAt,
+			&msg.CreatedAt,
+			&sender.ID,
+			&sender.Email,
+			&sender.Username,
+			&sender.IsActive,
+			&sender.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
 		}
+
+		msg.Sender = &sender
+		messages = append(messages, msg)
 	}
 
-	start := offset
-	if start > len(result) {
-		return []*model.ChatMessage{}, nil
-	}
-	end := start + limit
-	if end > len(result) {
-		end = len(result)
+	// Check if there are more messages
+	hasMore := len(messages) > limit
+	if hasMore {
+		messages = messages[:limit]
 	}
 
-	return result[start:end], nil
-}
-
-func (r *InMemoryMessageRepository) GetUndelivered(ctx context.Context, userID string) ([]*model.ChatMessage, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	var result []*model.ChatMessage
-	for _, msg := range r.messages {
-		if msg.Recipient == userID && msg.ReceivedAt == nil {
-			result = append(result, msg)
-		}
+	// Set next cursor
+	var nextCursor *string
+	if hasMore && len(messages) > 0 {
+		cursorStr := messages[len(messages)-1].SentAt.Format(time.RFC3339Nano)
+		nextCursor = &cursorStr
 	}
-	return result, nil
-}
 
-func (r *InMemoryMessageRepository) MarkAsDelivered(ctx context.Context, messageID string) error {
-	return nil
-}
-
-func (r *InMemoryMessageRepository) MarkAsRead(ctx context.Context, messageID string) error {
-	return nil
+	return &model.MessagesPage{
+		Messages:   messages,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	}, nil
 }
