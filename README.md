@@ -26,30 +26,41 @@ gochat-backend/
 │   │   ├── app.go               # Fiber app with Fx lifecycle
 │   │   ├── fx/
 │   │   │   └── module.go        # Fx dependency module
+│   │   ├── auth/
+│   │   │   ├── jwt.go           # JWT token service
+│   │   │   └── service.go       # Auth service (register/login)
 │   │   ├── chat/
 │   │   │   └── service.go       # Chat service with Redis Pub/Sub
 │   │   ├── handler/
+│   │   │   ├── auth.go          # Auth endpoints
 │   │   │   ├── health.go        # Health check handler
 │   │   │   └── websocket.go     # WebSocket handler
 │   │   ├── middleware/
+│   │   │   ├── auth.go          # JWT auth middleware
 │   │   │   ├── error_handler.go # Custom error handler
 │   │   │   └── middlewares.go   # Fiber middlewares setup
 │   │   ├── model/
-│   │   │   └── chat_message_model.go
+│   │   │   ├── user.go          # User model
+│   │   │   ├── conversation.go  # Conversation model
+│   │   │   └── message.go       # Message model
 │   │   ├── repository/
-│   │   │   └── message_repository.go  # Message persistence
+│   │   │   ├── user_repository.go         # User persistence
+│   │   │   ├── conversation_repository.go # Conversation persistence
+│   │   │   └── message_repository.go      # Message persistence
 │   │   └── worker/
-│   │       └── message_worker.go      # Redis Stream consumer
+│   │       └── message_worker.go          # Redis Stream consumer
 │   └── config/
 │       └── config.go            # Configuration (Fx provider)
 ├── pkg/
 │   ├── envutil/                 # Environment utilities
 │   ├── logger/                  # Zap logger wrapper
+│   ├── postgres/                # PostgreSQL client (Fx provider)
 │   └── redisclient/             # Redis client (Fx provider)
 ├── database/
 │   ├── schema.sql               # Complete database schema
 │   └── migrations/              # Versioned SQL migrations
 ├── docs/
+│   ├── AUTH.md                  # Authentication documentation
 │   └── DATABASE.md              # Database documentation
 ├── configs/
 │   └── local.env                # Local environment variables
@@ -59,7 +70,9 @@ gochat-backend/
 └── .golangci.yml                # Linter config
 ```
 
-> 📖 See [docs/DATABASE.md](docs/DATABASE.md) for complete database documentation.
+> 📖 **Documentation:**
+> - [docs/AUTH.md](docs/AUTH.md) - Authentication & JWT
+> - [docs/DATABASE.md](docs/DATABASE.md) - Database schema
 
 ## 🛠️ Getting Started
 
@@ -105,6 +118,29 @@ make dev
 
 ## 📡 API
 
+### Authentication
+
+```bash
+# Register
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@test.com","username":"alice","password":"12345678"}'
+
+# Login
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@test.com","password":"12345678"}'
+
+# Refresh Token
+curl -X POST http://localhost:8080/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token":"eyJhbG..."}'
+
+# Get Current User (protected)
+curl http://localhost:8080/api/v1/auth/me \
+  -H "Authorization: Bearer eyJhbG..."
+```
+
 ### Health Check
 
 ```bash
@@ -121,32 +157,52 @@ http://localhost:8080/metrics
 ### WebSocket Connection
 
 ```bash
-# Connect with wscat
-wscat -c "ws://localhost:8080/ws?token=alice"
+# Connect with JWT token
+wscat -c "ws://localhost:8080/ws?token=<access_token>"
 ```
 
 ### Message Format
 
 ```json
 {
-  "recipient": "bob",
-  "content": "Hello Bob!"
+  "recipient": "user-uuid",
+  "content": "Hello!"
 }
 ```
 
+> 📖 See [docs/AUTH.md](docs/AUTH.md) for complete authentication documentation.
+
 ## 🧪 Testing Chat
 
-Open two terminals:
+### 1. Create two users
 
 ```bash
-# Terminal 1 - Alice
-wscat -c "ws://localhost:8080/ws?token=alice"
+# Register Alice
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@test.com","username":"alice","password":"12345678"}'
 
-# Terminal 2 - Bob
-wscat -c "ws://localhost:8080/ws?token=bob"
+# Register Bob
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"bob@test.com","username":"bob","password":"12345678"}'
+```
 
-# In Alice's terminal, send:
-{"recipient": "bob", "content": "Hey Bob!"}
+### 2. Connect via WebSocket
+
+```bash
+# Terminal 1 - Alice (use access_token from register response)
+wscat -c "ws://localhost:8080/ws?token=<alice_access_token>"
+
+# Terminal 2 - Bob (use access_token from register response)
+wscat -c "ws://localhost:8080/ws?token=<bob_access_token>"
+```
+
+### 3. Send messages
+
+```bash
+# In Alice's terminal, send to Bob's user ID:
+{"recipient": "<bob_user_id>", "content": "Hey Bob!"}
 
 # Bob receives the message! ✅
 ```
@@ -250,28 +306,39 @@ If Bob is offline → He fetches history from PostgreSQL when reconnects
 │  Client  │                              │  Server  │
 └────┬─────┘                              └────┬─────┘
      │                                         │
-     │  POST /auth/register                    │
+     │  POST /api/v1/auth/register             │
      │  { email, username, password }          │
      │────────────────────────────────────────►│
-     │                                         │
-     │  { user }                               │
+     │                                         │ bcrypt hash
+     │                                         │ save to PostgreSQL
+     │  { user, tokens }                       │
      │◄────────────────────────────────────────│
      │                                         │
-     │  POST /auth/login                       │
+     │  POST /api/v1/auth/login                │
      │  { email, password }                    │
      │────────────────────────────────────────►│
+     │                                         │ verify password
+     │  { user, tokens }                       │ generate JWT
+     │◄────────────────────────────────────────│
      │                                         │
-     │  { access_token (15min),                │
-     │    refresh_token (7d) }                 │
+     │  access_token expires...                │
+     │                                         │
+     │  POST /api/v1/auth/refresh              │
+     │  { refresh_token }                      │
+     │────────────────────────────────────────►│
+     │                                         │
+     │  { new tokens }                         │
      │◄────────────────────────────────────────│
      │                                         │
      │  WS /ws?token={access_token}            │
      │────────────────────────────────────────►│
-     │                                         │
-     │  Connection established                 │
+     │                                         │ validate JWT
+     │  Connection established                 │ extract user_id
      │◄═══════════════════════════════════════►│
      │                                         │
 ```
+
+> 📖 See [docs/AUTH.md](docs/AUTH.md) for complete authentication documentation.
 
 ## 📝 TODO
 
@@ -280,9 +347,9 @@ If Bob is offline → He fetches history from PostgreSQL when reconnects
 - [x] Redis Streams for async processing
 - [x] Uber Fx dependency injection
 - [x] Database schema design
-- [ ] PostgreSQL integration
-- [ ] JWT Authentication (register, login, refresh)
-- [ ] User management (CRUD)
+- [x] PostgreSQL integration
+- [x] JWT Authentication (register, login, refresh)
+- [x] User management (CRUD)
 - [ ] Conversation management (create, list)
 - [ ] Message history with cursor pagination
 - [ ] Group chats

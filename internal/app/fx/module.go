@@ -3,6 +3,7 @@ package fx
 import (
 	"go.uber.org/fx"
 
+	"github.com/Beretta350/gochat/internal/app/auth"
 	"github.com/Beretta350/gochat/internal/app/chat"
 	"github.com/Beretta350/gochat/internal/app/handler"
 	"github.com/Beretta350/gochat/internal/app/repository"
@@ -19,6 +20,10 @@ var Module = fx.Options(
 	fx.Provide(postgres.NewClient),
 	fx.Provide(redisclient.NewClient),
 
+	// Auth
+	fx.Provide(auth.NewJWTService),
+	fx.Provide(auth.NewService),
+
 	// Repositories
 	fx.Provide(repository.NewUserRepository),
 	fx.Provide(repository.NewConversationRepository),
@@ -32,5 +37,6 @@ var Module = fx.Options(
 
 	// Handlers
 	fx.Provide(handler.NewHealthHandler),
+	fx.Provide(handler.NewAuthHandler),
 	fx.Provide(handler.NewWebSocketHandler),
 )

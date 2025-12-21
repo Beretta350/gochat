@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"go.uber.org/fx"
 
+	"github.com/Beretta350/gochat/internal/app/auth"
 	appfx "github.com/Beretta350/gochat/internal/app/fx"
 	"github.com/Beretta350/gochat/internal/app/handler"
 	"github.com/Beretta350/gochat/internal/app/middleware"
@@ -33,13 +34,15 @@ func Run() {
 type ServerParams struct {
 	fx.In
 
-	Lifecycle fx.Lifecycle
-	Config    *config.Config
-	Postgres  *postgres.Client
-	Redis     *redisclient.Client
-	Health    *handler.HealthHandler
-	WebSocket *handler.WebSocketHandler
-	Worker    *worker.MessageWorker
+	Lifecycle  fx.Lifecycle
+	Config     *config.Config
+	Postgres   *postgres.Client
+	Redis      *redisclient.Client
+	JWTService *auth.JWTService
+	Health     *handler.HealthHandler
+	Auth       *handler.AuthHandler
+	WebSocket  *handler.WebSocketHandler
+	Worker     *worker.MessageWorker
 }
 
 func startServer(p ServerParams) {
@@ -58,7 +61,8 @@ func startServer(p ServerParams) {
 		OnStart: func(ctx context.Context) error {
 			logger.Infof("🚀 Starting GoChat on port %s", p.Config.Server.Port)
 			logger.Info("📊 Metrics: /metrics")
-			logger.Info("🔌 WebSocket: /ws?token=<access_token>")
+			logger.Info("🔐 Auth: /api/v1/auth/*")
+			logger.Info("🔌 WebSocket: /ws?token=<jwt>")
 			logger.Info("❤️  Health: /api/v1/health")
 
 			// Start worker in background
@@ -83,11 +87,22 @@ func startServer(p ServerParams) {
 }
 
 func setupRoutes(app *fiber.App, p ServerParams) {
-	// API routes
+	// API v1 routes
 	api := app.Group("/api/v1")
+
+	// Health check (public)
 	api.Get("/health", p.Health.Check)
 
-	// WebSocket routes
+	// Auth routes (public)
+	authGroup := api.Group("/auth")
+	authGroup.Post("/register", p.Auth.Register)
+	authGroup.Post("/login", p.Auth.Login)
+	authGroup.Post("/refresh", p.Auth.Refresh)
+
+	// Protected auth routes
+	authGroup.Get("/me", middleware.AuthMiddleware(p.JWTService), p.Auth.Me)
+
+	// WebSocket routes (JWT in query string)
 	ws := app.Group("/ws")
 	ws.Use(p.WebSocket.Upgrade)
 	ws.Get("/", websocket.New(p.WebSocket.Handle(context.Background())))
