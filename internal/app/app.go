@@ -58,6 +58,9 @@ func startServer(p ServerParams) {
 	// Setup routes
 	setupRoutes(app, p)
 
+	// Worker context for graceful shutdown
+	var workerCancel context.CancelFunc
+
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			logger.Infof("🚀 Starting GoChat on port %s", p.Config.Server.Port)
@@ -67,8 +70,10 @@ func startServer(p ServerParams) {
 			logger.Info("🔌 WebSocket: /ws?token=<jwt>")
 			logger.Info("❤️  Health: /api/v1/health")
 
-			// Start worker in background
-			go p.Worker.Start(ctx)
+			// Start worker in background with its own context (not Fx's startup context)
+			var workerCtx context.Context
+			workerCtx, workerCancel = context.WithCancel(context.Background())
+			go p.Worker.Start(workerCtx)
 
 			// Start server in background
 			go func() {
@@ -81,6 +86,9 @@ func startServer(p ServerParams) {
 		},
 		OnStop: func(ctx context.Context) error {
 			logger.Info("Shutting down...")
+			if workerCancel != nil {
+				workerCancel()
+			}
 			_ = p.Redis.Close()
 			p.Postgres.Close()
 			return app.Shutdown()
