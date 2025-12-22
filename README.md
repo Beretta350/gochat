@@ -1,4 +1,4 @@
-# 💬 GoChat
+# 💬 GoChat Backend
 
 Real-time chat application built with Go, Fiber, Redis Pub/Sub, and WebSocket.
 
@@ -9,11 +9,12 @@ Real-time chat application built with Go, Fiber, Redis Pub/Sub, and WebSocket.
 | **Go 1.23** | Backend language |
 | **Fiber v2** | Web framework |
 | **Uber Fx** | Dependency injection |
-| **PostgreSQL** | Persistent storage (users, messages) |
-| **Redis** | Pub/Sub & Streams for real-time |
+| **PostgreSQL** | Persistent storage (users, conversations, messages) |
+| **Redis** | Pub/Sub (real-time) & Streams (async processing) |
 | **JWT** | Stateless authentication |
-| **WebSocket** | Real-time communication |
+| **WebSocket** | Real-time bidirectional communication |
 | **Docker** | Containerization |
+| **Air** | Hot reload for development |
 
 ## 📁 Project Structure
 
@@ -33,6 +34,7 @@ gochat-backend/
 │   │   │   └── service.go       # Chat service with Redis Pub/Sub
 │   │   ├── handler/
 │   │   │   ├── auth.go          # Auth endpoints
+│   │   │   ├── conversation.go  # Conversation endpoints
 │   │   │   ├── health.go        # Health check handler
 │   │   │   └── websocket.go     # WebSocket handler
 │   │   ├── middleware/
@@ -48,7 +50,7 @@ gochat-backend/
 │   │   │   ├── conversation_repository.go # Conversation persistence
 │   │   │   └── message_repository.go      # Message persistence
 │   │   └── worker/
-│   │       └── message_worker.go          # Redis Stream consumer
+│   │       └── message_worker.go          # Redis Stream → PostgreSQL
 │   └── config/
 │       └── config.go            # Configuration (Fx provider)
 ├── pkg/
@@ -62,9 +64,12 @@ gochat-backend/
 ├── docs/
 │   ├── AUTH.md                  # Authentication documentation
 │   └── DATABASE.md              # Database documentation
+├── scripts/
+│   └── dev/                     # Development scripts (gitignored)
 ├── configs/
 │   └── local.env                # Local environment variables
 ├── docker-compose.yml           # Redis + PostgreSQL containers
+├── Dockerfile                   # Production image
 ├── Makefile                     # Build and dev commands
 ├── .air.toml                    # Hot reload config
 └── .golangci.yml                # Linter config
@@ -82,24 +87,31 @@ gochat-backend/
 - Docker & Docker Compose
 - Make
 
-### Setup
+### Quick Start
 
 ```bash
 # Clone the repository
-git clone https://github.com/Beretta350/gochat.git
-cd gochat
+git clone https://github.com/Beretta350/gochat-backend.git
+cd gochat-backend
 
-# Install development tools (golangci-lint, air, goimports)
-make setup
-
-# Start Redis
+# Start Redis + PostgreSQL
 make docker-up
 
-# Run the server
-make run
-
-# Or with hot reload
+# Run the server (with hot reload)
 make dev
+
+# Or without hot reload
+make run
+```
+
+### Install Development Tools
+
+```bash
+# Install Air (hot reload)
+go install github.com/air-verse/air@latest
+
+# Install golangci-lint
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 ```
 
 ### Environment Variables
@@ -116,9 +128,40 @@ make dev
 | `JWT_ACCESS_EXPIRY` | `15m` | Access token expiration |
 | `JWT_REFRESH_EXPIRY` | `168h` | Refresh token expiration (7 days) |
 
-## 📡 API
+## 📡 API Endpoints
 
 ### Authentication
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/v1/auth/register` | ❌ | Create new user |
+| POST | `/api/v1/auth/login` | ❌ | Login and get tokens |
+| POST | `/api/v1/auth/refresh` | ❌ | Refresh access token |
+| GET | `/api/v1/auth/me` | ✅ | Get current user |
+
+### Conversations
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/v1/conversations` | ✅ | Create conversation (direct or group) |
+| GET | `/api/v1/conversations` | ✅ | List user's conversations |
+| GET | `/api/v1/conversations/:id` | ✅ | Get conversation details |
+| GET | `/api/v1/conversations/:id/messages` | ✅ | Get messages (with pagination) |
+
+### WebSocket
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `ws://localhost:8080/ws?token=<jwt>` | ✅ | Real-time messaging |
+
+### Other
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/health` | Health check |
+| GET | `/metrics` | Metrics dashboard |
+
+## 🔐 Authentication
 
 ```bash
 # Register
@@ -131,80 +174,121 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"alice@test.com","password":"12345678"}'
 
-# Refresh Token
-curl -X POST http://localhost:8080/api/v1/auth/refresh \
+# Response structure
+{
+  "user": { "id": "...", "email": "...", "username": "..." },
+  "tokens": {
+    "access_token": "eyJhbG...",
+    "refresh_token": "eyJhbG...",
+    "expires_in": 900
+  }
+}
+```
+
+## 💬 Conversations
+
+### Create Direct Conversation (1:1)
+
+```bash
+curl -X POST http://localhost:8080/api/v1/conversations \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"refresh_token":"eyJhbG..."}'
-
-# Get Current User (protected)
-curl http://localhost:8080/api/v1/auth/me \
-  -H "Authorization: Bearer eyJhbG..."
+  -d '{"participant_id": "<other_user_id>"}'
 ```
 
-### Health Check
+### Create Group Conversation
 
 ```bash
-curl http://localhost:8080/api/v1/health
+curl -X POST http://localhost:8080/api/v1/conversations \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Group",
+    "participant_ids": ["user_id_1", "user_id_2"]
+  }'
 ```
 
-### Metrics Dashboard
+### List Conversations
 
 ```bash
-# Open in browser
-http://localhost:8080/metrics
+curl http://localhost:8080/api/v1/conversations \
+  -H "Authorization: Bearer <token>"
 ```
 
-### WebSocket Connection
+### Get Messages (with cursor pagination)
 
 ```bash
-# Connect with JWT token
+curl "http://localhost:8080/api/v1/conversations/<id>/messages?limit=50" \
+  -H "Authorization: Bearer <token>"
+
+# For next page, use next_cursor from response
+curl "http://localhost:8080/api/v1/conversations/<id>/messages?cursor=<next_cursor>&limit=50" \
+  -H "Authorization: Bearer <token>"
+```
+
+## 🔌 WebSocket
+
+### Connect
+
+```bash
+# Using wscat
 wscat -c "ws://localhost:8080/ws?token=<access_token>"
+
+# Using websocat
+websocat "ws://localhost:8080/ws?token=<access_token>"
 ```
 
-### Message Format
+### Send Message
 
 ```json
 {
-  "recipient": "user-uuid",
+  "conversation_id": "<conversation_uuid>",
   "content": "Hello!"
 }
 ```
 
-> 📖 See [docs/AUTH.md](docs/AUTH.md) for complete authentication documentation.
+### Receive Message
+
+```json
+{
+  "id": "msg-uuid",
+  "conversation_id": "conv-uuid",
+  "sender_id": "user-uuid",
+  "sender_username": "alice",
+  "content": "Hello!",
+  "type": "text",
+  "sent_at": 1705834567890
+}
+```
 
 ## 🧪 Testing Chat
 
-### 1. Create two users
+### Quick Test Flow
 
 ```bash
-# Register Alice
+# 1. Register two users
 curl -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"alice@test.com","username":"alice","password":"12345678"}'
 
-# Register Bob
 curl -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"bob@test.com","username":"bob","password":"12345678"}'
-```
 
-### 2. Connect via WebSocket
+# 2. Create conversation (Alice creates with Bob)
+curl -X POST http://localhost:8080/api/v1/conversations \
+  -H "Authorization: Bearer <alice_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"participant_id": "<bob_id>"}'
 
-```bash
-# Terminal 1 - Alice (use access_token from register response)
-wscat -c "ws://localhost:8080/ws?token=<alice_access_token>"
+# 3. Connect both via WebSocket
+wscat -c "ws://localhost:8080/ws?token=<alice_token>"
+wscat -c "ws://localhost:8080/ws?token=<bob_token>"
 
-# Terminal 2 - Bob (use access_token from register response)
-wscat -c "ws://localhost:8080/ws?token=<bob_access_token>"
-```
+# 4. Alice sends message
+{"conversation_id": "<conv_id>", "content": "Hey Bob!"}
 
-### 3. Send messages
-
-```bash
-# In Alice's terminal, send to Bob's user ID:
-{"recipient": "<bob_user_id>", "content": "Hey Bob!"}
-
-# Bob receives the message! ✅
+# 5. Bob receives it in real-time! ✅
 ```
 
 ## 🔧 Development
@@ -212,15 +296,16 @@ wscat -c "ws://localhost:8080/ws?token=<bob_access_token>"
 ```bash
 make help           # Show all commands
 make run            # Run server
-make dev            # Run with hot reload
+make dev            # Run with hot reload (Air)
 make build          # Build binary
 make test           # Run tests
 make lint           # Run linter
 make lint-fix       # Run linter with auto-fix
 make fmt            # Format code
-make docker-up      # Start Redis
-make docker-down    # Stop Redis
-make docker-logs    # View Redis logs
+make docker-up      # Start Redis + PostgreSQL
+make docker-down    # Stop containers
+make docker-logs    # View container logs
+make docker-build   # Build Docker image
 make all            # fmt + lint + test + build
 ```
 
@@ -228,15 +313,54 @@ make all            # fmt + lint + test + build
 
 ### Dependency Injection (Uber Fx)
 
-The application uses **Uber Fx** for dependency injection, providing:
-- Automatic dependency resolution
-- Clean lifecycle management (start/stop hooks)
-- Testability through constructor injection
+```
+Config ─────────────────────────────────────────────────────────┐
+   │                                                            │
+   ├──► PostgresClient ──► UserRepository ──► AuthService       │
+   │                    ├──► ConversationRepository ──┐         │
+   │                    └──► MessageRepository ───────┼──► Handlers
+   │                                                  │         │
+   └──► RedisClient ────► ChatService ────────────────┘         │
+                      └──► MessageWorker ───────────────────────┘
+```
+
+### Message Flow
 
 ```
-Config → RedisClient → ChatService → WebSocketHandler
-                    ↘               ↗
-              MessageRepository → MessageWorker
+Alice sends message
+        │
+        ▼
+┌───────────────────┐
+│   WebSocket       │
+│   Handler         │
+└─────────┬─────────┘
+          │
+          ▼
+┌───────────────────┐     ┌─────────────────┐
+│   Chat Service    │────►│  Redis Stream   │
+└─────────┬─────────┘     └────────┬────────┘
+          │                        │
+          │                        ▼
+          │               ┌─────────────────┐
+          │               │  Message Worker │
+          │               └────────┬────────┘
+          │                        │
+          │                        ▼
+          │               ┌─────────────────┐
+          │               │   PostgreSQL    │
+          │               │  (persistence)  │
+          │               └─────────────────┘
+          │
+          ▼
+┌───────────────────┐
+│  Redis Pub/Sub    │
+│  channel:user:X   │
+└─────────┬─────────┘
+          │
+    ┌─────┴─────┐
+    ▼           ▼
+ Bob's PC   Bob's Phone
+ (online)    (online)
 ```
 
 ### System Overview
@@ -268,94 +392,22 @@ Config → RedisClient → ChatService → WebSocketHandler
                                       └─────────┘          └───────────┘
 ```
 
-### Message Flow
+## 📝 Features
 
-```
-Alice sends message to Bob
-           │
-           ▼
-┌─────────────────────────────┐
-│  1. Save to PostgreSQL      │ ──► Persistent storage
-└──────────────┬──────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│  2. Add to Redis Stream     │ ──► For async processing (optional)
-└──────────────┬──────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│  3. Publish to Pub/Sub      │ ──► channel: user:{bob_id}
-└──────────────┬──────────────┘
-               │
-       ┌───────┴───────┐
-       ▼               ▼
-   Bob's PC       Bob's Phone
-   (online)        (online)
-       │               │
-    RECEIVES        RECEIVES
-    via WS          via WS
-
-If Bob is offline → He fetches history from PostgreSQL when reconnects
-```
-
-### Authentication Flow (JWT)
-
-```
-┌──────────┐                              ┌──────────┐
-│  Client  │                              │  Server  │
-└────┬─────┘                              └────┬─────┘
-     │                                         │
-     │  POST /api/v1/auth/register             │
-     │  { email, username, password }          │
-     │────────────────────────────────────────►│
-     │                                         │ bcrypt hash
-     │                                         │ save to PostgreSQL
-     │  { user, tokens }                       │
-     │◄────────────────────────────────────────│
-     │                                         │
-     │  POST /api/v1/auth/login                │
-     │  { email, password }                    │
-     │────────────────────────────────────────►│
-     │                                         │ verify password
-     │  { user, tokens }                       │ generate JWT
-     │◄────────────────────────────────────────│
-     │                                         │
-     │  access_token expires...                │
-     │                                         │
-     │  POST /api/v1/auth/refresh              │
-     │  { refresh_token }                      │
-     │────────────────────────────────────────►│
-     │                                         │
-     │  { new tokens }                         │
-     │◄────────────────────────────────────────│
-     │                                         │
-     │  WS /ws?token={access_token}            │
-     │────────────────────────────────────────►│
-     │                                         │ validate JWT
-     │  Connection established                 │ extract user_id
-     │◄═══════════════════════════════════════►│
-     │                                         │
-```
-
-> 📖 See [docs/AUTH.md](docs/AUTH.md) for complete authentication documentation.
-
-## 📝 TODO
-
+- [x] JWT Authentication (register, login, refresh)
 - [x] WebSocket real-time messaging
 - [x] Redis Pub/Sub for multi-device support
-- [x] Redis Streams for async processing
+- [x] Redis Streams for async message processing
+- [x] PostgreSQL persistence
+- [x] Conversation management (direct & groups)
+- [x] Message history with cursor pagination
 - [x] Uber Fx dependency injection
-- [x] Database schema design
-- [x] PostgreSQL integration
-- [x] JWT Authentication (register, login, refresh)
-- [x] User management (CRUD)
-- [ ] Conversation management (create, list)
-- [ ] Message history with cursor pagination
-- [ ] Group chats
+- [x] Hot reload development (Air)
+- [x] Docker support
 - [ ] Typing indicators
 - [ ] Read receipts
 - [ ] File sharing
+- [ ] Push notifications
 
 ## 📄 License
 

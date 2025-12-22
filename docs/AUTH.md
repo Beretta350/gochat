@@ -196,6 +196,7 @@ ws://localhost:8080/ws?token=eyJhbGciOiJIUzI1NiIs...
 3. Server extracts user_id from token
 4. Connection established with user context
 5. User subscribes to their Redis Pub/Sub channel
+6. Pending messages (if offline) are delivered
 ```
 
 **Errors:**
@@ -257,6 +258,15 @@ In Postman, go to **Authorization** tab:
 
 In Postman WebSocket tab:
 - URL: `ws://localhost:8080/ws?token=<access_token>`
+
+### 4. Send Message
+
+```json
+{
+  "conversation_id": "<conversation_uuid>",
+  "content": "Hello!"
+}
+```
 
 ---
 

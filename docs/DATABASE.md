@@ -111,7 +111,7 @@ Stores all chat messages.
 | `sender_id` | UUID | FK, NOT NULL | Reference to sender |
 | `content` | TEXT | NOT NULL | Message content |
 | `type` | VARCHAR(20) | CHECK, DEFAULT | `'text'`, `'image'`, `'file'`, `'audio'` |
-| `sent_at` | TIMESTAMPTZ | NOT NULL | When message was sent |
+| `sent_at` | TIMESTAMPTZ | NOT NULL | When message was sent (client time) |
 | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | Database insertion time |
 
 **Indexes:**
@@ -141,26 +141,78 @@ ORDER BY c.updated_at DESC;
 ### Get conversation messages (cursor pagination)
 
 ```sql
-SELECT * FROM messages
-WHERE conversation_id = $1
-  AND sent_at > $2  -- cursor (last message sent_at)
-ORDER BY sent_at ASC
+-- Most recent first (default)
+SELECT m.id, m.conversation_id, m.sender_id, u.username, 
+       m.content, m.type, m.sent_at
+FROM messages m
+JOIN users u ON m.sender_id = u.id
+WHERE m.conversation_id = $1
+  AND m.sent_at < $2  -- cursor (optional)
+ORDER BY m.sent_at DESC
 LIMIT 50;
 ```
 
-### Find or create direct conversation
+### Find existing direct conversation
 
 ```sql
--- Find existing
 SELECT c.id FROM conversations c
 WHERE c.type = 'direct'
-  AND EXISTS (SELECT 1 FROM conversation_participants WHERE conversation_id = c.id AND user_id = $1)
-  AND EXISTS (SELECT 1 FROM conversation_participants WHERE conversation_id = c.id AND user_id = $2);
-
--- If not found, create new
-INSERT INTO conversations (type) VALUES ('direct') RETURNING id;
-INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($conv_id, $1), ($conv_id, $2);
+  AND EXISTS (
+    SELECT 1 FROM conversation_participants cp1
+    WHERE cp1.conversation_id = c.id 
+    AND cp1.user_id = $1 
+    AND cp1.left_at IS NULL
+  )
+  AND EXISTS (
+    SELECT 1 FROM conversation_participants cp2
+    WHERE cp2.conversation_id = c.id 
+    AND cp2.user_id = $2 
+    AND cp2.left_at IS NULL
+  );
 ```
+
+### Create direct conversation
+
+```sql
+-- 1. Create conversation
+INSERT INTO conversations (type) 
+VALUES ('direct') 
+RETURNING id;
+
+-- 2. Add participants
+INSERT INTO conversation_participants (conversation_id, user_id) 
+VALUES ($conv_id, $user1), ($conv_id, $user2);
+```
+
+### Batch insert messages (from Redis Stream worker)
+
+```sql
+INSERT INTO messages (conversation_id, sender_id, content, type, sent_at)
+VALUES 
+  ($1, $2, $3, $4, $5),
+  ($6, $7, $8, $9, $10),
+  ...;
+```
+
+---
+
+## Message Response Format
+
+When fetching messages via API, the response is flattened:
+
+```json
+{
+  "id": "msg-uuid",
+  "conversation_id": "conv-uuid",
+  "sender_id": "user-uuid",
+  "sender_username": "alice",
+  "content": "Hello!",
+  "type": "text",
+  "sent_at": "2025-12-22T22:16:21.203Z"
+}
+```
+
+> **Note:** `sender_username` is joined from the `users` table for convenience. The full sender object is not included to keep responses lightweight.
 
 ---
 
@@ -180,8 +232,39 @@ To run migrations, use [golang-migrate](https://github.com/golang-migrate/migrat
 go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 # Run migrations
-migrate -path database/migrations -database "postgres://user:pass@localhost:5432/gochat?sslmode=disable" up
+migrate -path database/migrations \
+  -database "postgres://user:pass@localhost:5432/gochat?sslmode=disable" up
 
-# Rollback
-migrate -path database/migrations -database "postgres://user:pass@localhost:5432/gochat?sslmode=disable" down 1
+# Rollback last migration
+migrate -path database/migrations \
+  -database "postgres://user:pass@localhost:5432/gochat?sslmode=disable" down 1
+
+# Check migration version
+migrate -path database/migrations \
+  -database "postgres://user:pass@localhost:5432/gochat?sslmode=disable" version
 ```
+
+---
+
+## Redis Integration
+
+While PostgreSQL handles persistence, Redis provides real-time capabilities:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Data Flow                               │
+│                                                             │
+│  WebSocket ──► Redis Stream ──► Worker ──► PostgreSQL       │
+│      │                                                      │
+│      └──► Redis Pub/Sub ──► Online users (real-time)        │
+│                                                             │
+│  API GET ◄────────────────────────────── PostgreSQL         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+| Component | Purpose |
+|-----------|---------|
+| **Redis Stream** | Buffer messages for batch insertion |
+| **Redis Pub/Sub** | Real-time delivery to online users |
+| **Redis Lists** | Pending messages for offline users |
+| **PostgreSQL** | Permanent storage, history queries |
