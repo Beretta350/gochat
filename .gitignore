@@ -22,8 +22,11 @@
 go.work
 go.work.sum
 
-# env file
+# env files (keep only .example files)
 .env
+!.env.example
+configs/*.env
+!configs/*.env.example
 
 # Generated mocks
 /mocks
