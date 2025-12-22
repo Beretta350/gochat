@@ -38,5 +38,6 @@ var Module = fx.Options(
 	// Handlers
 	fx.Provide(handler.NewHealthHandler),
 	fx.Provide(handler.NewAuthHandler),
+	fx.Provide(handler.NewConversationHandler),
 	fx.Provide(handler.NewWebSocketHandler),
 )

@@ -2,7 +2,7 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
+	"strconv"
 	"sync"
 	"time"
 
@@ -17,7 +17,7 @@ import (
 const (
 	consumerGroup = "message-workers"
 	batchSize     = 100
-	batchTimeout  = time.Second * 2
+	batchTimeout  = time.Millisecond * 500 // Flush every 500ms
 )
 
 // MessageWorker processes messages from Redis Stream and persists to PostgreSQL
@@ -91,43 +91,53 @@ func (w *MessageWorker) processMessages(ctx context.Context) {
 }
 
 func (w *MessageWorker) parseMessage(values map[string]interface{}) *model.Message {
-	msgJSON, ok := values["data"].(string)
-	if !ok {
+	// Debug: log raw values
+	logger.Infof("Worker parsing message: %+v", values)
+
+	// Get required fields
+	id, _ := values["id"].(string)
+	conversationID, _ := values["conversation_id"].(string)
+	senderID, _ := values["sender_id"].(string)
+	content, _ := values["content"].(string)
+
+	// Debug: log parsed fields
+	logger.Infof("Parsed - id: %s, conv: %s, sender: %s, content: %s", id, conversationID, senderID, content)
+
+	// Skip if missing required fields
+	if id == "" || conversationID == "" || senderID == "" || content == "" {
+		logger.Warnf("Skipping message - missing required fields")
 		return nil
 	}
 
-	// Parse the WebSocket message format
-	var wsMsg struct {
-		ID             string `json:"id"`
-		ConversationID string `json:"conversation_id"`
-		SenderID       string `json:"sender_id"`
-		Content        string `json:"content"`
-		Type           string `json:"type"`
-		SentAt         int64  `json:"sent_at"`
-	}
-
-	if err := json.Unmarshal([]byte(msgJSON), &wsMsg); err != nil {
-		logger.Errorf("Error parsing message: %v", err)
-		return nil
-	}
-
-	// Skip if no conversation_id (not ready for persistence yet)
-	if wsMsg.ConversationID == "" {
-		return nil
-	}
-
-	msgType := model.MessageType(wsMsg.Type)
+	// Get optional fields
+	msgType, _ := values["type"].(string)
 	if msgType == "" {
-		msgType = model.MessageTypeText
+		msgType = "text"
+	}
+
+	// Parse sent_at
+	var sentAt time.Time
+	if sentAtVal, ok := values["sent_at"]; ok {
+		switch v := sentAtVal.(type) {
+		case int64:
+			sentAt = time.UnixMilli(v)
+		case string:
+			if ts, err := strconv.ParseInt(v, 10, 64); err == nil {
+				sentAt = time.UnixMilli(ts)
+			}
+		}
+	}
+	if sentAt.IsZero() {
+		sentAt = time.Now()
 	}
 
 	return &model.Message{
-		ID:             wsMsg.ID,
-		ConversationID: wsMsg.ConversationID,
-		SenderID:       wsMsg.SenderID,
-		Content:        wsMsg.Content,
-		Type:           msgType,
-		SentAt:         time.UnixMilli(wsMsg.SentAt),
+		ID:             id,
+		ConversationID: conversationID,
+		SenderID:       senderID,
+		Content:        content,
+		Type:           model.MessageType(msgType),
+		SentAt:         sentAt,
 	}
 }
 
@@ -135,7 +145,9 @@ func (w *MessageWorker) addToBuffer(ctx context.Context, msg *model.Message) {
 	w.bufferLock.Lock()
 	defer w.bufferLock.Unlock()
 
+	logger.Infof("Adding message to buffer: conv=%s, sender=%s, content=%s", msg.ConversationID, msg.SenderID, msg.Content)
 	w.buffer = append(w.buffer, msg)
+	logger.Infof("Buffer size: %d", len(w.buffer))
 
 	if len(w.buffer) >= w.batchSize {
 		w.flushLocked(ctx)

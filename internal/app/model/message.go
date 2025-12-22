@@ -17,13 +17,10 @@ type Message struct {
 	ID             string      `json:"id"`
 	ConversationID string      `json:"conversation_id"`
 	SenderID       string      `json:"sender_id"`
+	SenderUsername string      `json:"sender_username,omitempty"`
 	Content        string      `json:"content"`
 	Type           MessageType `json:"type"`
 	SentAt         time.Time   `json:"sent_at"`
-	CreatedAt      time.Time   `json:"created_at"`
-
-	// Populated field
-	Sender *UserResponse `json:"sender,omitempty"`
 }
 
 // MessageCreate represents data to create/send a message

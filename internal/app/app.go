@@ -34,15 +34,16 @@ func Run() {
 type ServerParams struct {
 	fx.In
 
-	Lifecycle  fx.Lifecycle
-	Config     *config.Config
-	Postgres   *postgres.Client
-	Redis      *redisclient.Client
-	JWTService *auth.JWTService
-	Health     *handler.HealthHandler
-	Auth       *handler.AuthHandler
-	WebSocket  *handler.WebSocketHandler
-	Worker     *worker.MessageWorker
+	Lifecycle    fx.Lifecycle
+	Config       *config.Config
+	Postgres     *postgres.Client
+	Redis        *redisclient.Client
+	JWTService   *auth.JWTService
+	Health       *handler.HealthHandler
+	Auth         *handler.AuthHandler
+	Conversation *handler.ConversationHandler
+	WebSocket    *handler.WebSocketHandler
+	Worker       *worker.MessageWorker
 }
 
 func startServer(p ServerParams) {
@@ -62,6 +63,7 @@ func startServer(p ServerParams) {
 			logger.Infof("🚀 Starting GoChat on port %s", p.Config.Server.Port)
 			logger.Info("📊 Metrics: /metrics")
 			logger.Info("🔐 Auth: /api/v1/auth/*")
+			logger.Info("💬 Conversations: /api/v1/conversations/*")
 			logger.Info("🔌 WebSocket: /ws?token=<jwt>")
 			logger.Info("❤️  Health: /api/v1/health")
 
@@ -101,6 +103,13 @@ func setupRoutes(app *fiber.App, p ServerParams) {
 
 	// Protected auth routes
 	authGroup.Get("/me", middleware.AuthMiddleware(p.JWTService), p.Auth.Me)
+
+	// Conversation routes (protected)
+	convGroup := api.Group("/conversations", middleware.AuthMiddleware(p.JWTService))
+	convGroup.Post("/", p.Conversation.Create)
+	convGroup.Get("/", p.Conversation.List)
+	convGroup.Get("/:id", p.Conversation.Get)
+	convGroup.Get("/:id/messages", p.Conversation.GetMessages)
 
 	// WebSocket routes (JWT in query string)
 	ws := app.Group("/ws")
