@@ -49,3 +49,6 @@ build-errors.log
 
 # OS files
 .DS_Store
+
+# Scripts
+scripts/dev/*

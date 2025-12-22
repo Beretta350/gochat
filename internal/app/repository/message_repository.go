@@ -39,7 +39,7 @@ func (r *PostgresMessageRepository) Create(ctx context.Context, msg *model.Messa
 	query := `
 		INSERT INTO messages (conversation_id, sender_id, content, type, sent_at)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at
+		RETURNING id
 	`
 	return r.db.Pool.QueryRow(ctx, query,
 		msg.ConversationID,
@@ -47,7 +47,7 @@ func (r *PostgresMessageRepository) Create(ctx context.Context, msg *model.Messa
 		msg.Content,
 		msg.Type,
 		msg.SentAt,
-	).Scan(&msg.ID, &msg.CreatedAt)
+	).Scan(&msg.ID)
 }
 
 func (r *PostgresMessageRepository) CreateBatch(ctx context.Context, msgs []*model.Message) error {
@@ -62,18 +62,16 @@ func (r *PostgresMessageRepository) CreateBatch(ctx context.Context, msgs []*mod
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	for _, msg := range msgs {
-		query := `
+		_, err = tx.Exec(ctx, `
 			INSERT INTO messages (conversation_id, sender_id, content, type, sent_at)
 			VALUES ($1, $2, $3, $4, $5)
-			RETURNING id, created_at
-		`
-		err := tx.QueryRow(ctx, query,
+		`,
 			msg.ConversationID,
 			msg.SenderID,
 			msg.Content,
 			msg.Type,
 			msg.SentAt,
-		).Scan(&msg.ID, &msg.CreatedAt)
+		)
 		if err != nil {
 			return err
 		}
@@ -85,28 +83,21 @@ func (r *PostgresMessageRepository) CreateBatch(ctx context.Context, msgs []*mod
 
 func (r *PostgresMessageRepository) GetByID(ctx context.Context, id string) (*model.Message, error) {
 	query := `
-		SELECT m.id, m.conversation_id, m.sender_id, m.content, m.type, m.sent_at, m.created_at,
-		       u.id, u.email, u.username, u.is_active, u.created_at
+		SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.type, m.sent_at
 		FROM messages m
 		JOIN users u ON m.sender_id = u.id
 		WHERE m.id = $1
 	`
 	var msg model.Message
-	var sender model.UserResponse
 
 	err := r.db.Pool.QueryRow(ctx, query, id).Scan(
 		&msg.ID,
 		&msg.ConversationID,
 		&msg.SenderID,
+		&msg.SenderUsername,
 		&msg.Content,
 		&msg.Type,
 		&msg.SentAt,
-		&msg.CreatedAt,
-		&sender.ID,
-		&sender.Email,
-		&sender.Username,
-		&sender.IsActive,
-		&sender.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrMessageNotFound
@@ -115,7 +106,6 @@ func (r *PostgresMessageRepository) GetByID(ctx context.Context, id string) (*mo
 		return nil, err
 	}
 
-	msg.Sender = &sender
 	return &msg, nil
 }
 
@@ -131,8 +121,7 @@ func (r *PostgresMessageRepository) GetByConversation(ctx context.Context, conve
 
 	if cursor != nil {
 		query = `
-			SELECT m.id, m.conversation_id, m.sender_id, m.content, m.type, m.sent_at, m.created_at,
-			       u.id, u.email, u.username, u.is_active, u.created_at
+			SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.type, m.sent_at
 			FROM messages m
 			JOIN users u ON m.sender_id = u.id
 			WHERE m.conversation_id = $1 AND m.sent_at < $2
@@ -142,8 +131,7 @@ func (r *PostgresMessageRepository) GetByConversation(ctx context.Context, conve
 		args = []interface{}{conversationID, cursor, limit + 1} // +1 to check if there are more
 	} else {
 		query = `
-			SELECT m.id, m.conversation_id, m.sender_id, m.content, m.type, m.sent_at, m.created_at,
-			       u.id, u.email, u.username, u.is_active, u.created_at
+			SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.type, m.sent_at
 			FROM messages m
 			JOIN users u ON m.sender_id = u.id
 			WHERE m.conversation_id = $1
@@ -162,27 +150,20 @@ func (r *PostgresMessageRepository) GetByConversation(ctx context.Context, conve
 	var messages []model.Message
 	for rows.Next() {
 		var msg model.Message
-		var sender model.UserResponse
 
 		err := rows.Scan(
 			&msg.ID,
 			&msg.ConversationID,
 			&msg.SenderID,
+			&msg.SenderUsername,
 			&msg.Content,
 			&msg.Type,
 			&msg.SentAt,
-			&msg.CreatedAt,
-			&sender.ID,
-			&sender.Email,
-			&sender.Username,
-			&sender.IsActive,
-			&sender.CreatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		msg.Sender = &sender
 		messages = append(messages, msg)
 	}
 

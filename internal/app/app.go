@@ -34,15 +34,16 @@ func Run() {
 type ServerParams struct {
 	fx.In
 
-	Lifecycle  fx.Lifecycle
-	Config     *config.Config
-	Postgres   *postgres.Client
-	Redis      *redisclient.Client
-	JWTService *auth.JWTService
-	Health     *handler.HealthHandler
-	Auth       *handler.AuthHandler
-	WebSocket  *handler.WebSocketHandler
-	Worker     *worker.MessageWorker
+	Lifecycle    fx.Lifecycle
+	Config       *config.Config
+	Postgres     *postgres.Client
+	Redis        *redisclient.Client
+	JWTService   *auth.JWTService
+	Health       *handler.HealthHandler
+	Auth         *handler.AuthHandler
+	Conversation *handler.ConversationHandler
+	WebSocket    *handler.WebSocketHandler
+	Worker       *worker.MessageWorker
 }
 
 func startServer(p ServerParams) {
@@ -57,16 +58,22 @@ func startServer(p ServerParams) {
 	// Setup routes
 	setupRoutes(app, p)
 
+	// Worker context for graceful shutdown
+	var workerCancel context.CancelFunc
+
 	p.Lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			logger.Infof("🚀 Starting GoChat on port %s", p.Config.Server.Port)
 			logger.Info("📊 Metrics: /metrics")
 			logger.Info("🔐 Auth: /api/v1/auth/*")
+			logger.Info("💬 Conversations: /api/v1/conversations/*")
 			logger.Info("🔌 WebSocket: /ws?token=<jwt>")
 			logger.Info("❤️  Health: /api/v1/health")
 
-			// Start worker in background
-			go p.Worker.Start(ctx)
+			// Start worker in background with its own context (not Fx's startup context)
+			var workerCtx context.Context
+			workerCtx, workerCancel = context.WithCancel(context.Background())
+			go p.Worker.Start(workerCtx)
 
 			// Start server in background
 			go func() {
@@ -79,6 +86,9 @@ func startServer(p ServerParams) {
 		},
 		OnStop: func(ctx context.Context) error {
 			logger.Info("Shutting down...")
+			if workerCancel != nil {
+				workerCancel()
+			}
 			_ = p.Redis.Close()
 			p.Postgres.Close()
 			return app.Shutdown()
@@ -101,6 +111,13 @@ func setupRoutes(app *fiber.App, p ServerParams) {
 
 	// Protected auth routes
 	authGroup.Get("/me", middleware.AuthMiddleware(p.JWTService), p.Auth.Me)
+
+	// Conversation routes (protected)
+	convGroup := api.Group("/conversations", middleware.AuthMiddleware(p.JWTService))
+	convGroup.Post("/", p.Conversation.Create)
+	convGroup.Get("/", p.Conversation.List)
+	convGroup.Get("/:id", p.Conversation.Get)
+	convGroup.Get("/:id/messages", p.Conversation.GetMessages)
 
 	// WebSocket routes (JWT in query string)
 	ws := app.Group("/ws")

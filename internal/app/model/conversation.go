@@ -32,16 +32,43 @@ const (
 	ParticipantRoleMember ParticipantRole = "member"
 )
 
-// Participant represents a user's participation in a conversation
+// Participant represents a user's participation in a conversation (internal)
 type Participant struct {
-	ConversationID string           `json:"conversation_id"`
-	UserID         string           `json:"user_id"`
-	Role           *ParticipantRole `json:"role,omitempty"` // NULL for direct, 'admin'/'member' for groups
-	JoinedAt       time.Time        `json:"joined_at"`
-	LeftAt         *time.Time       `json:"left_at,omitempty"`
+	ConversationID string
+	UserID         string
+	Role           *ParticipantRole
+	JoinedAt       time.Time
+	LeftAt         *time.Time
 
 	// Populated field
-	User *UserResponse `json:"user,omitempty"`
+	User *UserResponse
+}
+
+// ParticipantResponse is the flattened API response for a participant
+type ParticipantResponse struct {
+	ID        string           `json:"id"`
+	Email     string           `json:"email"`
+	Username  string           `json:"username"`
+	IsActive  bool             `json:"is_active"`
+	Role      *ParticipantRole `json:"role,omitempty"`
+	JoinedAt  time.Time        `json:"joined_at"`
+	CreatedAt time.Time        `json:"created_at"`
+}
+
+// ToResponse converts Participant to flattened response
+func (p *Participant) ToResponse() *ParticipantResponse {
+	if p.User == nil {
+		return nil
+	}
+	return &ParticipantResponse{
+		ID:        p.User.ID,
+		Email:     p.User.Email,
+		Username:  p.User.Username,
+		IsActive:  p.User.IsActive,
+		Role:      p.Role,
+		JoinedAt:  p.JoinedAt,
+		CreatedAt: p.User.CreatedAt,
+	}
 }
 
 // ConversationCreate represents data to create a conversation
