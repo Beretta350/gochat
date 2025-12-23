@@ -2,6 +2,8 @@
 
 Real-time chat application built with Go, Fiber, Redis Pub/Sub, and WebSocket.
 
+> ⚠️ **Security Note:** This repository contains example/development credentials (database passwords, JWT secrets). These are **for local development only**. Always use strong, unique secrets in production environments.
+
 ## 🚀 Tech Stack
 
 | Technology | Purpose |
