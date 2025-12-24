@@ -2,8 +2,9 @@
 .PHONY: docker-up docker-down docker-logs docker-build docker-restart
 .PHONY: docker-infra docker-infra-down
 .PHONY: docker-api-up docker-api-build docker-api-logs docker-api-restart
+.PHONY: docker-web-up docker-web-build docker-web-logs docker-web-restart
 .PHONY: dev-api api-build api-test api-lint api-fmt
-.PHONY: dev-web web-build web-lint web-test
+.PHONY: dev-web web-install web-build web-lint web-test
 
 # Colors
 GREEN=\033[0;32m
@@ -16,7 +17,7 @@ help:
 	@echo "$(CYAN)GoChat - Full Stack Commands$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Docker - Full Stack:$(NC)"
-	@echo "  make docker-up           Start ALL services (api + db + redis)"
+	@echo "  make docker-up           Start ALL services (web + api + infra)"
 	@echo "  make docker-down         Stop all services"
 	@echo "  make docker-logs         View all logs"
 	@echo "  make docker-build        Build all Docker images"
@@ -32,6 +33,12 @@ help:
 	@echo "  make docker-api-logs     View API logs only"
 	@echo "  make docker-api-restart  Rebuild and restart API"
 	@echo ""
+	@echo "$(YELLOW)Docker - Frontend Only:$(NC)"
+	@echo "  make docker-web-up       Start Web + API + infra"
+	@echo "  make docker-web-build    Build Web Docker image"
+	@echo "  make docker-web-logs     View Web logs only"
+	@echo "  make docker-web-restart  Rebuild and restart Web"
+	@echo ""
 	@echo "$(YELLOW)Development (Local):$(NC)"
 	@echo "  make dev-api             Run API locally with hot reload"
 	@echo "  make dev-web             Run frontend dev server"
@@ -43,6 +50,7 @@ help:
 	@echo "  make api-fmt             Format backend code"
 	@echo ""
 	@echo "$(YELLOW)Frontend (Next.js):$(NC)"
+	@echo "  make web-install         Install frontend dependencies"
 	@echo "  make web-build           Build frontend"
 	@echo "  make web-lint            Lint frontend code"
 	@echo "  make web-test            Run frontend tests"
@@ -56,6 +64,7 @@ docker-up:
 	@echo "$(GREEN)Starting all services...$(NC)"
 	@docker-compose up -d
 	@echo "$(GREEN)Services started:$(NC)"
+	@echo "  - Frontend: http://localhost:3000"
 	@echo "  - API: http://localhost:8080"
 	@echo "  - Redis UI: http://localhost:8081"
 
@@ -129,6 +138,37 @@ docker-api-restart:
 	@echo "$(GREEN)API restarted$(NC)"
 
 # ========================
+# Docker - Frontend Only
+# ========================
+
+## docker-web-up: Start Web + API + infrastructure (Docker)
+docker-web-up:
+	@echo "$(GREEN)Starting Web + API + infrastructure...$(NC)"
+	@docker-compose up -d postgres redis redis-commander api web
+	@echo "$(GREEN)Services started:$(NC)"
+	@echo "  - Frontend: http://localhost:3000"
+	@echo "  - API: http://localhost:8080"
+	@echo "  - PostgreSQL: localhost:5432"
+	@echo "  - Redis: localhost:6379"
+	@echo "  - Redis UI: http://localhost:8081"
+
+## docker-web-build: Build Web Docker image
+docker-web-build:
+	@echo "$(GREEN)Building Web image...$(NC)"
+	@docker-compose build web
+	@echo "$(GREEN)Web image built$(NC)"
+
+## docker-web-logs: View Web logs only
+docker-web-logs:
+	@docker-compose logs -f web
+
+## docker-web-restart: Rebuild and restart Web only
+docker-web-restart:
+	@echo "$(GREEN)Restarting Web...$(NC)"
+	@docker-compose up -d --build web
+	@echo "$(GREEN)Web restarted$(NC)"
+
+# ========================
 # Development (Local)
 # ========================
 
@@ -169,6 +209,11 @@ api-fmt:
 # ========================
 # Frontend Commands
 # ========================
+
+## web-install: Install frontend dependencies
+web-install:
+	@echo "$(GREEN)Installing frontend dependencies...$(NC)"
+	@cd frontend && npm install
 
 ## web-build: Build frontend for production
 web-build:

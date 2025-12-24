@@ -57,7 +57,10 @@ gochat/
 
 | Layer | Technology |
 |-------|------------|
-| **Frontend** | Next.js, React, TypeScript, Tailwind CSS |
+| **Frontend** | Next.js 14, React 18, TypeScript, Tailwind CSS |
+| **State Management** | Redux Toolkit, RTK Query |
+| **UI Components** | Radix UI, Framer Motion |
+| **Forms** | React Hook Form, Zod |
 | **Backend** | Go 1.23, Fiber v2, Uber Fx |
 | **Database** | PostgreSQL 16 |
 | **Cache/Realtime** | Redis 7 (Pub/Sub + Streams) |
@@ -106,29 +109,46 @@ make dev-web
 ## 📋 Available Commands
 
 ```bash
-make help           # Show all commands
+make help                # Show all commands
 
-# Full Stack
-make up             # Start all services (Docker)
-make down           # Stop all services
-make logs           # View all logs
+# Docker - Full Stack
+make docker-up           # Start all services (web + api + infra)
+make docker-down         # Stop all services
+make docker-logs         # View all logs
+make docker-build        # Build all images
+make docker-restart      # Rebuild and restart all
 
-# Infrastructure
-make infra          # Start only PostgreSQL + Redis
-make infra-down     # Stop infrastructure
+# Docker - Infrastructure
+make docker-infra        # Start only PostgreSQL + Redis
+make docker-infra-down   # Stop infrastructure
 
-# Development
-make dev-api        # Run backend with hot reload
-make dev-web        # Run frontend with hot reload
+# Docker - Backend Only
+make docker-api-up       # Start API + infra (no frontend)
+make docker-api-build    # Build API image
+make docker-api-logs     # View API logs
+make docker-api-restart  # Rebuild and restart API
 
-# Backend specific
-make api-build      # Build backend
-make api-test       # Run backend tests
-make api-lint       # Lint backend code
+# Docker - Frontend Only  
+make docker-web-up       # Start Web + API + infra
+make docker-web-build    # Build Web image
+make docker-web-logs     # View Web logs
+make docker-web-restart  # Rebuild and restart Web
 
-# Frontend specific
-make web-build      # Build frontend
-make web-lint       # Lint frontend code
+# Development (Local)
+make dev-api             # Run backend with hot reload
+make dev-web             # Run frontend dev server
+
+# Backend (Go)
+make api-build           # Build backend binary
+make api-test            # Run backend tests
+make api-lint            # Lint backend code
+make api-fmt             # Format backend code
+
+# Frontend (Next.js)
+make web-install         # Install dependencies
+make web-build           # Build frontend
+make web-lint            # Lint frontend code
+make web-test            # Run frontend tests
 ```
 
 ## 🔗 API Endpoints
@@ -148,6 +168,7 @@ make web-lint       # Lint frontend code
 
 ## ✨ Features
 
+### Backend
 - [x] User authentication (register, login, JWT)
 - [x] Real-time messaging via WebSocket
 - [x] Direct messages (1:1)
@@ -155,10 +176,21 @@ make web-lint       # Lint frontend code
 - [x] Message history with pagination
 - [x] Multi-device support (Redis Pub/Sub)
 - [x] Offline message queue
+
+### Frontend
+- [x] Modern responsive UI (mobile-first)
+- [x] Dark theme with custom color palette
+- [x] Smooth animations (Framer Motion)
+- [x] Form validation (React Hook Form + Zod)
+- [x] State management (Redux Toolkit)
+- [x] Data caching (RTK Query)
+
+### Coming Soon
 - [ ] Typing indicators
 - [ ] Read receipts
 - [ ] File sharing
 - [ ] Push notifications
+- [ ] PWA support
 
 ## 📄 License
 

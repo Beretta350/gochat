@@ -1,4 +1,24 @@
 services:
+  # ========================
+  # Frontend
+  # ========================
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8080
+        - NEXT_PUBLIC_WS_URL=ws://localhost:8080
+    container_name: gochat-web
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ========================
+  # Backend API
+  # ========================
   api:
     build:
       context: ./backend
@@ -21,6 +41,9 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ========================
+  # Infrastructure
+  # ========================
   postgres:
     image: postgres:16-alpine
     container_name: gochat-postgres
