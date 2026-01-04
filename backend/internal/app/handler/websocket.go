@@ -29,8 +29,14 @@ func NewWebSocketHandler(chatService *chat.Service, jwtService *auth.JWTService)
 // Upgrade is a middleware that checks if the request is a WebSocket upgrade
 func (h *WebSocketHandler) Upgrade(c *fiber.Ctx) error {
 	if websocket.IsWebSocketUpgrade(c) {
-		// Get token from query string
-		token := c.Query("token")
+		// Try to get token from cookie first (preferred)
+		token := c.Cookies(AccessTokenCookie)
+
+		// Fallback to query string (for clients that can't use cookies)
+		if token == "" {
+			token = c.Query("token")
+		}
+
 		if token == "" {
 			return fiber.NewError(fiber.StatusUnauthorized, "Missing token")
 		}

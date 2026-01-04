@@ -25,6 +25,7 @@ type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
 	JWT      JWTConfig
+	Cookie   CookieConfig
 }
 
 // ServerConfig holds the server configuration
@@ -49,6 +50,13 @@ type JWTConfig struct {
 	Secret        string
 	AccessExpiry  time.Duration
 	RefreshExpiry time.Duration
+}
+
+// CookieConfig holds cookie configuration
+type CookieConfig struct {
+	Domain   string
+	Secure   bool   // true for HTTPS
+	SameSite string // "Strict", "Lax", or "None"
 }
 
 // NewConfig creates a new Config (Fx provider)
@@ -83,6 +91,11 @@ func NewConfig() (*Config, error) {
 			Secret:        envutil.GetEnv("JWT_SECRET", "your-super-secret-key-change-in-production"),
 			AccessExpiry:  envutil.GetEnvDuration("JWT_ACCESS_EXPIRY", 15*time.Minute),
 			RefreshExpiry: envutil.GetEnvDuration("JWT_REFRESH_EXPIRY", 7*24*time.Hour),
+		},
+		Cookie: CookieConfig{
+			Domain:   envutil.GetEnv("COOKIE_DOMAIN", "localhost"),
+			Secure:   envutil.GetEnvBool("COOKIE_SECURE", false), // true em produção (HTTPS)
+			SameSite: envutil.GetEnv("COOKIE_SAMESITE", "Lax"),
 		},
 	}
 

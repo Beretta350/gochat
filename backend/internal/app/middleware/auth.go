@@ -8,22 +8,40 @@ import (
 	"github.com/Beretta350/gochat/internal/app/auth"
 )
 
+const (
+	AccessTokenCookie = "access_token"
+)
+
+// getTokenFromRequest extracts the JWT token from cookie or Authorization header
+func getTokenFromRequest(c *fiber.Ctx) string {
+	// First, try to get token from cookie (preferred, more secure)
+	token := c.Cookies(AccessTokenCookie)
+	if token != "" {
+		return token
+	}
+
+	// Fallback to Authorization header (for backward compatibility / API clients)
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return ""
+	}
+
+	// Check Bearer prefix
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return ""
+	}
+
+	return parts[1]
+}
+
 // AuthMiddleware creates a JWT authentication middleware
 func AuthMiddleware(jwtService *auth.JWTService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Get token from Authorization header
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			return fiber.NewError(fiber.StatusUnauthorized, "Missing authorization header")
+		tokenString := getTokenFromRequest(c)
+		if tokenString == "" {
+			return fiber.NewError(fiber.StatusUnauthorized, "Missing authentication")
 		}
-
-		// Check Bearer prefix
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			return fiber.NewError(fiber.StatusUnauthorized, "Invalid authorization format")
-		}
-
-		tokenString := parts[1]
 
 		// Validate token
 		claims, err := jwtService.ValidateAccessToken(tokenString)
@@ -46,17 +64,10 @@ func AuthMiddleware(jwtService *auth.JWTService) fiber.Handler {
 // OptionalAuthMiddleware extracts user info if token is present, but doesn't require it
 func OptionalAuthMiddleware(jwtService *auth.JWTService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		authHeader := c.Get("Authorization")
-		if authHeader == "" {
+		tokenString := getTokenFromRequest(c)
+		if tokenString == "" {
 			return c.Next()
 		}
-
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			return c.Next()
-		}
-
-		tokenString := parts[1]
 
 		claims, err := jwtService.ValidateAccessToken(tokenString)
 		if err != nil {
