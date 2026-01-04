@@ -128,9 +128,9 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
 
         {/* User section */}
         <div className="p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-9 w-9">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <Avatar className="h-9 w-9 flex-shrink-0">
                 <AvatarFallback
                   className={cn(
                     "text-xs",
@@ -140,17 +140,17 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
                   {getInitials(user?.username || "User")}
                 </AvatarFallback>
               </Avatar>
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate leading-tight">
                   {user?.username}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="text-xs text-muted-foreground truncate leading-tight">
                   {user?.email}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">

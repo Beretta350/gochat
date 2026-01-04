@@ -55,20 +55,20 @@ export function MessageInput({
 
   return (
     <div className="p-4 border-t border-border bg-background-secondary/50">
-      <div className="flex items-end gap-2">
+      <div className="flex items-center gap-3">
         {/* Attachment button */}
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+          className="flex-shrink-0 h-10 w-10 text-muted-foreground hover:text-foreground"
           disabled={disabled}
         >
           <Paperclip className="w-5 h-5" />
         </Button>
 
         {/* Input container */}
-        <div className="flex-1 relative">
+        <div className="flex-1 flex items-center relative">
           <textarea
             ref={textareaRef}
             value={message}
@@ -78,13 +78,13 @@ export function MessageInput({
             disabled={disabled}
             rows={1}
             className={cn(
-              "w-full resize-none bg-muted rounded-2xl px-4 py-3 pr-12 text-sm",
+              "w-full resize-none bg-muted rounded-2xl px-4 py-2.5 pr-12 text-sm leading-6",
               "placeholder:text-muted-foreground",
               "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
               "disabled:opacity-50 disabled:cursor-not-allowed",
               "scrollbar-hide"
             )}
-            style={{ maxHeight: "120px" }}
+            style={{ maxHeight: "120px", minHeight: "44px" }}
           />
           
           {/* Emoji button */}
@@ -92,7 +92,7 @@ export function MessageInput({
             type="button"
             variant="ghost"
             size="icon"
-            className="absolute right-2 bottom-1.5 h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
             disabled={disabled}
           >
             <Smile className="w-5 h-5" />
@@ -107,13 +107,14 @@ export function MessageInput({
             opacity: canSend ? 1 : 0.5,
           }}
           transition={{ duration: 0.15 }}
+          className="flex-shrink-0"
         >
           <Button
             type="button"
             size="icon"
             onClick={handleSubmit}
             disabled={!canSend}
-            className="flex-shrink-0 rounded-full w-10 h-10"
+            className="rounded-full w-10 h-10"
           >
             <Send className="w-5 h-5" />
           </Button>
