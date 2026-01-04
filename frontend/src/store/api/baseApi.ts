@@ -1,17 +1,50 @@
-import { fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import type { RootState } from "../store";
+import {
+  fetchBaseQuery,
+  type BaseQueryFn,
+  type FetchArgs,
+  type FetchBaseQueryError,
+} from "@reduxjs/toolkit/query/react";
+import { logout } from "../slices/authSlice";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
-export const baseQuery = fetchBaseQuery({
-  baseUrl: `${API_URL}/api/v1`,
-  prepareHeaders: (headers, { getState }) => {
-    const token = (getState() as RootState).auth.accessToken;
-    if (token) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
+// Com Next.js rewrites, usamos URLs relativas (mesmo origin)
+const rawBaseQuery = fetchBaseQuery({
+  baseUrl: "/api/v1",
+  credentials: "include", // Envia cookies automaticamente
+  prepareHeaders: (headers) => {
     headers.set("Content-Type", "application/json");
     return headers;
   },
 });
 
+// BaseQuery with automatic token refresh on 401
+export const baseQuery: BaseQueryFn<
+  string | FetchArgs,
+  unknown,
+  FetchBaseQueryError
+> = async (args, api, extraOptions) => {
+  let result = await rawBaseQuery(args, api, extraOptions);
+
+  // If we get a 401, try to refresh the token
+  if (result.error && result.error.status === 401) {
+    // Try to refresh the token (cookie is sent automatically)
+    const refreshResult = await rawBaseQuery(
+      {
+        url: "/auth/refresh",
+        method: "POST",
+      },
+      api,
+      extraOptions
+    );
+
+    if (refreshResult.data) {
+      // Refresh succeeded - new cookies are set automatically by backend
+      // Retry the original request
+      result = await rawBaseQuery(args, api, extraOptions);
+    } else {
+      // Refresh failed - logout user
+      api.dispatch(logout());
+    }
+  }
+
+  return result;
+};

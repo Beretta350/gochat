@@ -5,23 +5,25 @@ import { useAppDispatch, useAppSelector } from "@/store";
 import { addMessage, setConnected } from "@/store/slices/chatSlice";
 import type { WebSocketMessage, SendMessageRequest } from "@/types";
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080";
-
 export function useWebSocket() {
   const dispatch = useAppDispatch();
-  const { accessToken } = useAppSelector((state) => state.auth);
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
   const { isConnected } = useAppSelector((state) => state.chat);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
   const connect = useCallback(() => {
-    if (!accessToken || wsRef.current?.readyState === WebSocket.OPEN) {
+    if (!isAuthenticated || wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
 
     try {
-      const ws = new WebSocket(`${WS_URL}/ws?token=${accessToken}`);
+      // Use relative URL with Next.js proxy - cookies are sent automatically
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+      const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         console.log("WebSocket connected");
@@ -32,7 +34,7 @@ export function useWebSocket() {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          
+
           // Check if it's an error message
           if (data.error) {
             console.error("WebSocket error:", data.message);
@@ -63,7 +65,7 @@ export function useWebSocket() {
         wsRef.current = null;
 
         // Reconnect logic with exponential backoff
-        if (accessToken && reconnectAttempts < 5) {
+        if (isAuthenticated && reconnectAttempts < 5) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
           console.log(`Reconnecting in ${delay}ms...`);
           reconnectTimeoutRef.current = setTimeout(() => {
@@ -81,7 +83,7 @@ export function useWebSocket() {
     } catch (err) {
       console.error("Failed to create WebSocket connection:", err);
     }
-  }, [accessToken, dispatch, reconnectAttempts]);
+  }, [isAuthenticated, dispatch, reconnectAttempts]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -104,14 +106,16 @@ export function useWebSocket() {
   }, []);
 
   useEffect(() => {
-    if (accessToken) {
+    if (isAuthenticated) {
       connect();
+    } else {
+      disconnect();
     }
 
     return () => {
       disconnect();
     };
-  }, [accessToken, connect, disconnect]);
+  }, [isAuthenticated, connect, disconnect]);
 
   return {
     isConnected,
@@ -120,4 +124,3 @@ export function useWebSocket() {
     disconnect,
   };
 }
-

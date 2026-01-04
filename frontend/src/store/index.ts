@@ -3,11 +3,17 @@ export type { RootState, AppDispatch } from "./store";
 export { useAppDispatch, useAppSelector } from "./hooks";
 
 // Auth
-export { authApi, useLoginMutation, useRegisterMutation, useGetMeQuery } from "./api/authApi";
+export {
+  authApi,
+  useLoginMutation,
+  useRegisterMutation,
+  useLogoutMutation,
+  useGetMeQuery,
+  useLazyGetMeQuery,
+} from "./api/authApi";
 export {
   setCredentials,
   setUser,
-  setTokens,
   logout,
   setLoading,
 } from "./slices/authSlice";
@@ -33,4 +39,3 @@ export {
   setConnected,
   clearUnread,
 } from "./slices/chatSlice";
-

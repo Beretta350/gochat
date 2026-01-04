@@ -9,76 +9,77 @@ import {
   logout as logoutAction,
   setLoading,
 } from "@/store";
-import { useLoginMutation, useRegisterMutation } from "@/store/api/authApi";
+import {
+  useLoginMutation,
+  useRegisterMutation,
+  useLogoutMutation,
+  useLazyGetMeQuery,
+} from "@/store/api/authApi";
 import type { LoginRequest, RegisterRequest } from "@/types";
-
-const TOKEN_KEY = "gochat_tokens";
-
-interface StoredTokens {
-  accessToken: string;
-  refreshToken: string;
-}
 
 export function useAuth() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  
+  const [isValidating, setIsValidating] = useState(true);
+
   const authState = useAppSelector((state) => state.auth);
   const user = authState?.user ?? null;
   const isAuthenticated = authState?.isAuthenticated ?? false;
-  const accessToken = authState?.accessToken ?? null;
 
   const [loginMutation, { isLoading: isLoginLoading }] = useLoginMutation();
   const [registerMutation, { isLoading: isRegisterLoading }] =
     useRegisterMutation();
+  const [logoutMutation] = useLogoutMutation();
+  const [getMe] = useLazyGetMeQuery();
 
-  // Load tokens from localStorage on mount
+  // Validate session on mount by calling /me
+  // If cookies are valid, backend will authenticate
   useEffect(() => {
-    setMounted(true);
-    
-    if (typeof window === "undefined") return;
-    
-    const stored = localStorage.getItem(TOKEN_KEY);
-    if (stored) {
+    const validateSession = async () => {
+      setMounted(true);
+
+      if (typeof window === "undefined") {
+        setIsValidating(false);
+        dispatch(setLoading(false));
+        return;
+      }
+
       try {
-        const tokens: StoredTokens = JSON.parse(stored);
+        // Try to get current user (cookies are sent automatically)
+        const result = await getMe().unwrap();
+
+        // Session is valid - set user in store
         dispatch(
           setCredentials({
-            user: { id: "", email: "", username: "", is_active: true, created_at: "" },
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
+            user: result,
           })
         );
       } catch {
-        localStorage.removeItem(TOKEN_KEY);
+        // Session is invalid or no cookies - user not authenticated
+        dispatch(logoutAction());
+      } finally {
+        setIsValidating(false);
+        dispatch(setLoading(false));
       }
-    }
-    dispatch(setLoading(false));
-  }, [dispatch]);
-  
-  // isLoading is true until mounted on client
-  const isLoading = !mounted;
+    };
+
+    validateSession();
+  }, [dispatch, getMe]);
+
+  // isLoading is true until mounted and validated on client
+  const isLoading = !mounted || isValidating;
 
   const login = useCallback(
     async (credentials: LoginRequest) => {
       try {
         const response = await loginMutation(credentials).unwrap();
-        
-        // Store tokens
-        localStorage.setItem(
-          TOKEN_KEY,
-          JSON.stringify({
-            accessToken: response.tokens.access_token,
-            refreshToken: response.tokens.refresh_token,
-          })
-        );
 
+        // Cookies are set automatically by the backend
+        // Just update the store with user info
         dispatch(
           setCredentials({
             user: response.user,
-            accessToken: response.tokens.access_token,
-            refreshToken: response.tokens.refresh_token,
           })
         );
 
@@ -100,20 +101,11 @@ export function useAuth() {
       try {
         const response = await registerMutation(data).unwrap();
 
-        // Store tokens
-        localStorage.setItem(
-          TOKEN_KEY,
-          JSON.stringify({
-            accessToken: response.tokens.access_token,
-            refreshToken: response.tokens.refresh_token,
-          })
-        );
-
+        // Cookies are set automatically by the backend
+        // Just update the store with user info
         dispatch(
           setCredentials({
             user: response.user,
-            accessToken: response.tokens.access_token,
-            refreshToken: response.tokens.refresh_token,
           })
         );
 
@@ -130,17 +122,21 @@ export function useAuth() {
     [registerMutation, dispatch, router]
   );
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
+  const logout = useCallback(async () => {
+    try {
+      // Call backend to clear cookies
+      await logoutMutation().unwrap();
+    } catch {
+      // Even if API call fails, clear local state
+    }
     dispatch(logoutAction());
     router.push("/login");
-  }, [dispatch, router]);
+  }, [dispatch, router, logoutMutation]);
 
   return {
     user,
     isAuthenticated,
     isLoading,
-    accessToken,
     login,
     register,
     logout,
@@ -148,4 +144,3 @@ export function useAuth() {
     isRegisterLoading,
   };
 }
-
