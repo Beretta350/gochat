@@ -35,6 +35,25 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
+  /* Fix autocomplete background color */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus,
+  textarea:-webkit-autofill:active,
+  select:-webkit-autofill,
+  select:-webkit-autofill:hover,
+  select:-webkit-autofill:focus,
+  select:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px hsl(210 50% 16%) inset !important;
+    -webkit-text-fill-color: hsl(0 0% 100%) !important;
+    caret-color: hsl(0 0% 100%) !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 8px;

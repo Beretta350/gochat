@@ -59,34 +59,33 @@ help:
 # Docker - Full Stack
 # ========================
 
-## docker-up: Start all services with Docker Compose
+## docker-up: Start all services with Docker Compose (builds if needed)
 docker-up:
 	@echo "$(GREEN)Starting all services...$(NC)"
-	@docker-compose up -d
+	@docker compose up -d
 	@echo "$(GREEN)Services started:$(NC)"
-	@echo "  - Frontend: http://localhost:3000"
-	@echo "  - API: http://localhost:8080"
+	@echo "  - App: http://localhost"
 	@echo "  - Redis UI: http://localhost:8081"
 
 ## docker-down: Stop all services
 docker-down:
 	@echo "$(GREEN)Stopping all services...$(NC)"
-	@docker-compose down
+	@docker compose down
 
 ## docker-logs: View logs from all services
 docker-logs:
-	@docker-compose logs -f
+	@docker compose logs -f
 
 ## docker-build: Build all Docker images
 docker-build:
 	@echo "$(GREEN)Building all services...$(NC)"
-	@docker-compose build
+	@docker compose build
 
 ## docker-restart: Rebuild and restart all services
 docker-restart:
 	@echo "$(GREEN)Restarting all services...$(NC)"
-	@docker-compose down
-	@docker-compose up -d --build
+	@docker compose down
+	@docker compose up -d --build
 	@echo "$(GREEN)All services restarted$(NC)"
 
 # ========================
@@ -96,7 +95,7 @@ docker-restart:
 ## docker-infra: Start only PostgreSQL and Redis
 docker-infra:
 	@echo "$(GREEN)Starting infrastructure...$(NC)"
-	@docker-compose up -d postgres redis redis-commander
+	@docker compose up -d postgres redis redis-commander
 	@echo "$(GREEN)Infrastructure started:$(NC)"
 	@echo "  - PostgreSQL: localhost:5432"
 	@echo "  - Redis: localhost:6379"
@@ -105,7 +104,7 @@ docker-infra:
 ## docker-infra-down: Stop infrastructure
 docker-infra-down:
 	@echo "$(GREEN)Stopping infrastructure...$(NC)"
-	@docker-compose down
+	@docker compose down
 
 # ========================
 # Docker - Backend Only
@@ -114,9 +113,9 @@ docker-infra-down:
 ## docker-api-up: Start API with infrastructure (Docker)
 docker-api-up:
 	@echo "$(GREEN)Starting API + infrastructure...$(NC)"
-	@docker-compose up -d postgres redis redis-commander api
+	@docker compose up -d postgres redis redis-commander api
 	@echo "$(GREEN)Services started:$(NC)"
-	@echo "  - API: http://localhost:8080"
+	@echo "  - API: internal (use nginx for access)"
 	@echo "  - PostgreSQL: localhost:5432"
 	@echo "  - Redis: localhost:6379"
 	@echo "  - Redis UI: http://localhost:8081"
@@ -124,17 +123,17 @@ docker-api-up:
 ## docker-api-build: Build API Docker image
 docker-api-build:
 	@echo "$(GREEN)Building API image...$(NC)"
-	@docker-compose build api
+	@docker compose build api
 	@echo "$(GREEN)API image built$(NC)"
 
 ## docker-api-logs: View API logs only
 docker-api-logs:
-	@docker-compose logs -f api
+	@docker compose logs -f api
 
 ## docker-api-restart: Rebuild and restart API only
 docker-api-restart:
 	@echo "$(GREEN)Restarting API...$(NC)"
-	@docker-compose up -d --build api
+	@docker compose up -d --build api
 	@echo "$(GREEN)API restarted$(NC)"
 
 # ========================
@@ -144,28 +143,25 @@ docker-api-restart:
 ## docker-web-up: Start Web + API + infrastructure (Docker)
 docker-web-up:
 	@echo "$(GREEN)Starting Web + API + infrastructure...$(NC)"
-	@docker-compose up -d postgres redis redis-commander api web
+	@docker compose up -d postgres redis redis-commander api web nginx
 	@echo "$(GREEN)Services started:$(NC)"
-	@echo "  - Frontend: http://localhost:3000"
-	@echo "  - API: http://localhost:8080"
-	@echo "  - PostgreSQL: localhost:5432"
-	@echo "  - Redis: localhost:6379"
+	@echo "  - App: http://localhost"
 	@echo "  - Redis UI: http://localhost:8081"
 
 ## docker-web-build: Build Web Docker image
 docker-web-build:
 	@echo "$(GREEN)Building Web image...$(NC)"
-	@docker-compose build web
+	@docker compose build web
 	@echo "$(GREEN)Web image built$(NC)"
 
 ## docker-web-logs: View Web logs only
 docker-web-logs:
-	@docker-compose logs -f web
+	@docker compose logs -f web
 
 ## docker-web-restart: Rebuild and restart Web only
 docker-web-restart:
 	@echo "$(GREEN)Restarting Web...$(NC)"
-	@docker-compose up -d --build web
+	@docker compose up -d --build web
 	@echo "$(GREEN)Web restarted$(NC)"
 
 # ========================
