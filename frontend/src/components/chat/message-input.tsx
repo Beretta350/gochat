@@ -78,13 +78,13 @@ export function MessageInput({
             disabled={disabled}
             rows={1}
             className={cn(
-              "w-full resize-none bg-muted rounded-2xl px-4 py-2.5 pr-12 text-sm leading-6",
+              "w-full resize-none bg-muted rounded-2xl px-4 py-3 pr-12 text-base leading-6",
               "placeholder:text-muted-foreground",
               "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background",
               "disabled:opacity-50 disabled:cursor-not-allowed",
               "scrollbar-hide"
             )}
-            style={{ maxHeight: "120px", minHeight: "44px" }}
+            style={{ maxHeight: "120px", minHeight: "48px" }}
           />
           
           {/* Emoji button */}
