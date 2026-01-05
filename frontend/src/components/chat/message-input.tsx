@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { Send, Smile, Paperclip } from "lucide-react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -100,7 +100,7 @@ export function MessageInput({
         </div>
 
         {/* Send button */}
-        <motion.div
+        <m.div
           initial={false}
           animate={{
             scale: canSend ? 1 : 0.9,
@@ -118,7 +118,7 @@ export function MessageInput({
           >
             <Send className="w-5 h-5" />
           </Button>
-        </motion.div>
+        </m.div>
       </div>
     </div>
   );

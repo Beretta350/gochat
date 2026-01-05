@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { ChevronLeft, Phone, Video, MoreVertical, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ export function ChatHeader({
   }, [conversation, currentUserId, isConnected]);
 
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       className="flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary/50 backdrop-blur-sm"
@@ -117,7 +117,7 @@ export function ChatHeader({
           <MoreVertical className="w-5 h-5" />
         </Button>
       </div>
-    </motion.div>
+    </m.div>
   );
 }
 

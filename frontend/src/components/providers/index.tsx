@@ -1,5 +1,6 @@
 "use client";
 
+import { LazyMotion, domAnimation } from "framer-motion";
 import { ReduxProvider } from "./redux-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ToastProvider, ToastViewport } from "@/components/ui/toast";
@@ -11,12 +12,14 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <ReduxProvider>
-      <ToastProvider>
-        <TooltipProvider delayDuration={0}>
-          {children}
-          <ToastViewport />
-        </TooltipProvider>
-      </ToastProvider>
+      <LazyMotion features={domAnimation} strict>
+        <ToastProvider>
+          <TooltipProvider delayDuration={0}>
+            {children}
+            <ToastViewport />
+          </TooltipProvider>
+        </ToastProvider>
+      </LazyMotion>
     </ReduxProvider>
   );
 }

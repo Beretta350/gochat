@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn, getInitials } from "@/lib/utils";
@@ -109,7 +109,7 @@ interface MessageBubbleProps {
 
 function MessageBubble({ message, isSent, showAvatar, time }: MessageBubbleProps) {
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.2 }}
@@ -165,13 +165,13 @@ function MessageBubble({ message, isSent, showAvatar, time }: MessageBubbleProps
           {time}
         </span>
       </div>
-    </motion.div>
+    </m.div>
   );
 }
 
 export function TypingIndicator({ username }: { username?: string }) {
   return (
-    <motion.div
+    <m.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
@@ -187,7 +187,7 @@ export function TypingIndicator({ username }: { username?: string }) {
           {username} is typing...
         </span>
       )}
-    </motion.div>
+    </m.div>
   );
 }
 

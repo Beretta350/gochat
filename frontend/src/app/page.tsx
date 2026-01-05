@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { m } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { MessageCircle, Shield, Zap, Users } from "lucide-react";
 
@@ -40,7 +41,12 @@ export default function HomePage() {
           </nav>
 
           {/* Hero Content */}
-          <div className="text-center max-w-4xl mx-auto animate-fade-in">
+          <m.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="text-center max-w-4xl mx-auto"
+          >
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
               Chat in{" "}
               <span className="gradient-text">Real-Time</span>
@@ -65,10 +71,15 @@ export default function HomePage() {
                 </Button>
               </Link>
             </div>
-          </div>
+          </m.div>
 
           {/* Features */}
-          <div className="mt-24 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
+          <m.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mt-24 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          >
             <FeatureCard
               icon={<Zap className="w-6 h-6" />}
               title="Lightning Fast"
@@ -89,7 +100,7 @@ export default function HomePage() {
               title="Multi-device"
               description="Stay connected across all your devices"
             />
-          </div>
+          </m.div>
         </div>
       </div>
 

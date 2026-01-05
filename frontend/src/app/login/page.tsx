@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { Loader2, Mail, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,7 +77,7 @@ export default function LoginPage() {
   if (checkingAuth || authSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <motion.div
+        <m.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="bg-card border border-border rounded-2xl p-8 shadow-xl flex flex-col items-center gap-4"
@@ -95,7 +95,7 @@ export default function LoginPage() {
               <p className="text-sm text-muted-foreground">Please wait</p>
             </>
           )}
-        </motion.div>
+        </m.div>
       </div>
     );
   }
@@ -105,13 +105,13 @@ export default function LoginPage() {
       {/* Submitting Overlay */}
       <AnimatePresence>
         {isSubmitting && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
           >
-            <motion.div
+            <m.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -120,8 +120,8 @@ export default function LoginPage() {
               <Loader2 className="w-12 h-12 animate-spin text-primary" />
               <p className="text-lg font-medium">Signing in...</p>
               <p className="text-sm text-muted-foreground">Please wait</p>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         )}
       </AnimatePresence>
 
@@ -135,13 +135,13 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {error && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm"
             >
               {error}
-            </motion.div>
+            </m.div>
           )}
 
           <div className="space-y-2">

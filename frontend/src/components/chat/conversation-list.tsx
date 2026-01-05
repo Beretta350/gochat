@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 import { MessageCircle, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -108,7 +108,7 @@ function ConversationItem({
   }, [conversation.last_message]);
 
   return (
-    <motion.button
+    <m.button
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2, delay: index * 0.05 }}
@@ -156,7 +156,7 @@ function ConversationItem({
           )}
         </div>
       </div>
-    </motion.button>
+    </m.button>
   );
 }
 

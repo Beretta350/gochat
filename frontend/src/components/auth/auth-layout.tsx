@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { m } from "framer-motion";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -20,7 +20,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         </div>
 
         <div className="relative z-10 flex flex-col items-center justify-center w-full p-12">
-          <motion.div
+          <m.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
@@ -37,21 +37,21 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             <p className="text-xl text-foreground-muted max-w-md">
               Connect with anyone, anywhere. Fast, secure, and real-time.
             </p>
-          </motion.div>
+          </m.div>
 
           {/* Floating chat bubbles decoration */}
           <div className="absolute inset-0 pointer-events-none">
-            <motion.div
+            <m.div
               animate={{ y: [0, -10, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               className="absolute top-1/4 left-1/4 w-16 h-16 bg-primary/20 rounded-2xl rounded-bl-sm"
             />
-            <motion.div
+            <m.div
               animate={{ y: [0, 10, 0] }}
               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               className="absolute bottom-1/3 right-1/4 w-20 h-12 bg-accent/20 rounded-2xl rounded-br-sm"
             />
-            <motion.div
+            <m.div
               animate={{ y: [0, -15, 0] }}
               transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
               className="absolute top-1/2 right-1/3 w-12 h-12 bg-secondary/20 rounded-2xl rounded-bl-sm"
@@ -77,13 +77,13 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             </Link>
           </div>
 
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
           >
             {children}
-          </motion.div>
+          </m.div>
         </div>
       </div>
     </div>

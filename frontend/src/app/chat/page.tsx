@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { m, AnimatePresence } from "framer-motion";
 import { MessageCircle, Loader2 } from "lucide-react";
 import { Sidebar } from "@/components/chat/sidebar";
 import { ChatHeader } from "@/components/chat/chat-header";
@@ -146,7 +146,7 @@ function ChatContent() {
       >
         <AnimatePresence mode="wait">
           {activeConversation ? (
-            <motion.div
+            <m.div
               key={activeConversation.id}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -176,9 +176,9 @@ function ChatContent() {
                   isConnected ? "Type a message..." : "Connecting..."
                 }
               />
-            </motion.div>
+            </m.div>
           ) : (
-            <motion.div
+            <m.div
               key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -197,7 +197,7 @@ function ChatContent() {
                   begin chatting.
                 </p>
               </div>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>
