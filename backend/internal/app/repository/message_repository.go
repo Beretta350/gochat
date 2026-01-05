@@ -116,27 +116,36 @@ func (r *PostgresMessageRepository) GetByConversation(ctx context.Context, conve
 	}
 
 	// Build query based on cursor
+	// Subquery fetches most recent messages (DESC), outer query orders them ASC for display
 	var query string
 	var args []interface{}
 
 	if cursor != nil {
+		// Cursor means "get messages older than this timestamp"
 		query = `
-			SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.type, m.sent_at
-			FROM messages m
-			JOIN users u ON m.sender_id = u.id
-			WHERE m.conversation_id = $1 AND m.sent_at < $2
-			ORDER BY m.sent_at DESC
-			LIMIT $3
+			SELECT * FROM (
+				SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.type, m.sent_at
+				FROM messages m
+				JOIN users u ON m.sender_id = u.id
+				WHERE m.conversation_id = $1 AND m.sent_at < $2
+				ORDER BY m.sent_at DESC
+				LIMIT $3
+			) AS recent
+			ORDER BY sent_at ASC
 		`
 		args = []interface{}{conversationID, cursor, limit + 1} // +1 to check if there are more
 	} else {
+		// No cursor = get the most recent messages
 		query = `
-			SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.type, m.sent_at
-			FROM messages m
-			JOIN users u ON m.sender_id = u.id
-			WHERE m.conversation_id = $1
-			ORDER BY m.sent_at DESC
-			LIMIT $2
+			SELECT * FROM (
+				SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.type, m.sent_at
+				FROM messages m
+				JOIN users u ON m.sender_id = u.id
+				WHERE m.conversation_id = $1
+				ORDER BY m.sent_at DESC
+				LIMIT $2
+			) AS recent
+			ORDER BY sent_at ASC
 		`
 		args = []interface{}{conversationID, limit + 1}
 	}
@@ -167,16 +176,19 @@ func (r *PostgresMessageRepository) GetByConversation(ctx context.Context, conve
 		messages = append(messages, msg)
 	}
 
-	// Check if there are more messages
+	// Check if there are more messages (older ones)
 	hasMore := len(messages) > limit
 	if hasMore {
-		messages = messages[:limit]
+		// Remove the extra message (it was just to check hasMore)
+		// Since messages are now ASC, the extra one is the first (oldest)
+		messages = messages[1:]
 	}
 
-	// Set next cursor
+	// Set next cursor (points to the oldest message in current batch for loading more)
 	var nextCursor *string
 	if hasMore && len(messages) > 0 {
-		cursorStr := messages[len(messages)-1].SentAt.Format(time.RFC3339Nano)
+		// First message is the oldest after removing the extra
+		cursorStr := messages[0].SentAt.Format(time.RFC3339Nano)
 		nextCursor = &cursorStr
 	}
 
