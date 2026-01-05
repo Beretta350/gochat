@@ -7,23 +7,30 @@ A full-stack real-time chat application built with **Go** and **Next.js**.
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              GoChat                                      │
-├─────────────────────────────────┬───────────────────────────────────────┤
-│           Frontend              │              Backend                   │
-│  ┌───────────────────────────┐  │  ┌─────────────────────────────────┐  │
-│  │        Next.js            │  │  │           Go + Fiber            │  │
-│  │   TypeScript + Tailwind   │◄─┼──►   WebSocket + REST API         │  │
-│  │        React              │  │  │     JWT Authentication         │  │
-│  └───────────────────────────┘  │  └───────────────┬─────────────────┘  │
-│                                 │                  │                    │
-│                                 │    ┌─────────────┼─────────────┐      │
-│                                 │    ▼             ▼             ▼      │
-│                                 │ ┌──────┐   ┌─────────┐   ┌──────────┐ │
-│                                 │ │Redis │   │ Redis   │   │PostgreSQL│ │
-│                                 │ │Pub/Sub│   │ Stream  │   │          │ │
-│                                 │ └──────┘   └─────────┘   └──────────┘ │
-└─────────────────────────────────┴───────────────────────────────────────┘
+                            ┌─────────────────┐
+                            │     Browser     │
+                            └────────┬────────┘
+                                     │
+                            ┌────────▼────────┐
+                            │  nginx (port 80)│
+                            │  Reverse Proxy  │
+                            └────────┬────────┘
+                                     │
+              ┌──────────────────────┼──────────────────────┐
+              │ /                    │ /api/* & /ws         │
+              ▼                      ▼                      │
+    ┌─────────────────┐    ┌─────────────────┐              │
+    │    Next.js      │    │   Go + Fiber    │              │
+    │   (port 3000)   │    │   (port 8080)   │              │
+    │   Frontend      │    │   Backend API   │              │
+    └─────────────────┘    └────────┬────────┘              │
+                                    │                       │
+                     ┌──────────────┼──────────────┐        │
+                     ▼              ▼              ▼        │
+              ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
+              │  Redis   │  │  Redis   │  │  PostgreSQL  │  │
+              │  Pub/Sub │  │  Stream  │  │              │  │
+              └──────────┘  └──────────┘  └──────────────┘  │
 ```
 
 ## 📁 Project Structure
@@ -43,11 +50,13 @@ gochat/
 │   │   ├── app/            # Next.js App Router
 │   │   ├── components/     # React components
 │   │   ├── hooks/          # Custom hooks
-│   │   ├── stores/         # State management
+│   │   ├── store/          # Redux state management
 │   │   ├── lib/            # Utilities
 │   │   └── types/          # TypeScript types
 │   └── README.md           # Frontend-specific docs
 │
+├── nginx.conf              # Production reverse proxy config
+├── nginx-dev.conf          # Development reverse proxy config
 ├── docker-compose.yml      # Full stack orchestration
 ├── Makefile                # Project commands
 └── README.md               # You are here
@@ -59,13 +68,14 @@ gochat/
 |-------|------------|
 | **Frontend** | Next.js 14, React 18, TypeScript, Tailwind CSS |
 | **State Management** | Redux Toolkit, RTK Query |
-| **UI Components** | Radix UI, Framer Motion |
+| **UI Components** | Radix UI, Framer Motion (LazyMotion) |
 | **Forms** | React Hook Form, Zod |
 | **Backend** | Go 1.23, Fiber v2, Uber Fx |
 | **Database** | PostgreSQL 16 |
 | **Cache/Realtime** | Redis 7 (Pub/Sub + Streams) |
-| **Auth** | JWT (Access + Refresh tokens) |
+| **Auth** | JWT (HttpOnly cookies) |
 | **Realtime** | WebSocket |
+| **Reverse Proxy** | nginx |
 | **Infrastructure** | Docker, Docker Compose |
 
 ## 🛠️ Getting Started
@@ -84,26 +94,32 @@ gochat/
 git clone https://github.com/Beretta350/gochat.git
 cd gochat
 
-# Start all services
-make up
+# Start all services (builds and runs everything)
+make docker-up
 
-# Services will be available at:
-# - Frontend: http://localhost:3000
-# - Backend API: http://localhost:8080
+# Access the application:
+# - App: http://localhost
 # - Redis Commander: http://localhost:8081
 ```
 
-### Development Mode
+### Development Mode (Hot Reload)
 
 ```bash
-# Start infrastructure (PostgreSQL + Redis)
-make infra
+# Start infrastructure + nginx (for local development)
+make docker-dev
 
 # In one terminal - run backend with hot reload
 make dev-api
 
 # In another terminal - run frontend with hot reload
 make dev-web
+
+# Access the application:
+# - App: http://localhost (nginx proxies to local services)
+# - Redis Commander: http://localhost:8081
+
+# Stop dev environment
+make docker-dev-down
 ```
 
 ## 📋 Available Commands
@@ -112,18 +128,20 @@ make dev-web
 make help                # Show all commands
 
 # Docker - Full Stack
-make docker-up           # Start all services (web + api + infra)
+make docker-up           # Build and start all services
 make docker-down         # Stop all services
 make docker-logs         # View all logs
 make docker-build        # Build all images
 make docker-restart      # Rebuild and restart all
 
-# Docker - Infrastructure
+# Docker - Development
+make docker-dev          # Start infra + nginx (for local dev with hot reload)
+make docker-dev-down     # Stop dev environment
 make docker-infra        # Start only PostgreSQL + Redis
 make docker-infra-down   # Stop infrastructure
 
 # Docker - Backend Only
-make docker-api-up       # Start API + infra (no frontend)
+make docker-api-up       # Start API + infra
 make docker-api-build    # Build API image
 make docker-api-logs     # View API logs
 make docker-api-restart  # Rebuild and restart API

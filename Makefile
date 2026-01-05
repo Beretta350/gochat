@@ -24,7 +24,9 @@ help:
 	@echo "  make docker-restart      Rebuild and restart all"
 	@echo ""
 	@echo "$(YELLOW)Docker - Infrastructure:$(NC)"
-	@echo "  make docker-infra        Start PostgreSQL + Redis (for local dev)"
+	@echo "  make docker-infra        Start PostgreSQL + Redis only"
+	@echo "  make docker-dev          Start infra + nginx (for local dev)"
+	@echo "  make docker-dev-down     Stop dev environment"
 	@echo "  make docker-infra-down   Stop infrastructure"
 	@echo ""
 	@echo "$(YELLOW)Docker - Backend Only:$(NC)"
@@ -100,6 +102,31 @@ docker-infra:
 	@echo "  - PostgreSQL: localhost:5432"
 	@echo "  - Redis: localhost:6379"
 	@echo "  - Redis UI: http://localhost:8081"
+
+## docker-dev: Start infra + nginx for local development
+docker-dev:
+	@echo "$(GREEN)Starting dev environment (infra + nginx)...$(NC)"
+	@docker compose up -d postgres redis redis-commander
+	@docker run -d --rm --name gochat-nginx-dev \
+		-p 80:80 \
+		-v $(PWD)/nginx-dev.conf:/etc/nginx/conf.d/default.conf:ro \
+		--add-host=host.docker.internal:host-gateway \
+		nginx:alpine
+	@echo "$(GREEN)Dev environment started:$(NC)"
+	@echo "  - App: http://localhost (via nginx)"
+	@echo "  - PostgreSQL: localhost:5432"
+	@echo "  - Redis: localhost:6379"
+	@echo "  - Redis UI: http://localhost:8081"
+	@echo ""
+	@echo "$(YELLOW)Now run in separate terminals:$(NC)"
+	@echo "  make dev-api"
+	@echo "  make dev-web"
+
+## docker-dev-down: Stop dev environment
+docker-dev-down:
+	@echo "$(GREEN)Stopping dev environment...$(NC)"
+	@docker stop gochat-nginx-dev 2>/dev/null || true
+	@docker compose down
 
 ## docker-infra-down: Stop infrastructure
 docker-infra-down:
