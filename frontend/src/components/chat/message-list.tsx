@@ -29,15 +29,8 @@ export function MessageList({ messages, currentUserId }: MessageListProps) {
     });
   };
 
-  // Sort messages by sent_at timestamp
-  const sortedMessages = [...messages].sort((a, b) => {
-    const timeA = typeof a.sent_at === "number" ? a.sent_at : new Date(a.sent_at).getTime();
-    const timeB = typeof b.sent_at === "number" ? b.sent_at : new Date(b.sent_at).getTime();
-    return timeA - timeB;
-  });
-
-  // Group messages by date
-  const groupedMessages = sortedMessages.reduce((groups, message) => {
+  // Group messages by date (messages come pre-sorted from backend)
+  const groupedMessages = messages.reduce((groups, message) => {
     const date = new Date(
       typeof message.sent_at === "number" ? message.sent_at : message.sent_at
     ).toLocaleDateString("en-US", {
