@@ -1,57 +1,93 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# ========================
+# Backend (Go)
+# ========================
+
+# Binaries
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 *.iml
-
-# Test binary, built with `go test -c`
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
+# Go workspace
 go.work
 go.work.sum
 
-# env files (keep only .example files)
-.env
-!.env.example
-configs/*.env
-!configs/*.env.example
-
-# Generated mocks
-/mocks
-
-# Logs and temporary files
-*.log
-*.tmp
-
-# Editor/IDE settings
-.vscode/
-.idea/
-
 # Build artifacts
-/bin/
-/tmp/
+backend/bin/
+backend/tmp/
 
 # Coverage
-coverage.out
-coverage.html
+backend/coverage.out
+backend/coverage.html
 
 # Air (hot reload)
-build-errors.log
+backend/build-errors.log
 
-# OS files
+# Generated mocks
+backend/mocks/
+
+# ========================
+# Frontend (Node.js)
+# ========================
+
+# Dependencies
+frontend/node_modules/
+
+# Build output
+frontend/.next/
+frontend/out/
+frontend/dist/
+
+# Testing
+frontend/coverage/
+
+# Debug
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# ========================
+# Environment
+# ========================
+
+# Env files (keep only examples)
+.env
+.env.local
+.env.*.local
+!.env.example
+backend/configs/*.env
+!backend/configs/*.env.example
+
+# ========================
+# IDE & Editors
+# ========================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ========================
+# OS
+# ========================
+
 .DS_Store
+Thumbs.db
 
-# Scripts
-scripts/dev/*
+# ========================
+# Logs
+# ========================
+
+*.log
+logs/
+
+# ========================
+# Dev Scripts
+# ========================
+
+backend/scripts/dev/*
