@@ -26,16 +26,16 @@ export function ConversationList({
 
   return (
     <ScrollArea className="flex-1">
-      <div className="p-2 space-y-1">
+      <div className="px-3 py-2 space-y-1">
         {conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <MessageCircle className="w-8 h-8 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
+              <MessageCircle className="w-10 h-10 text-muted-foreground" />
             </div>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-muted-foreground text-sm font-medium">
               No conversations yet
             </p>
-            <p className="text-muted-foreground text-xs mt-1">
+            <p className="text-muted-foreground text-xs mt-2">
               Start a new conversation to begin chatting
             </p>
           </div>
@@ -114,12 +114,12 @@ function ConversationItem({
       transition={{ duration: 0.2, delay: index * 0.05 }}
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200",
+        "w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200",
         "hover:bg-muted/50",
         isActive && "bg-muted"
       )}
     >
-      <div className="relative">
+      <div className="relative flex-shrink-0">
         <Avatar className="h-12 w-12">
           <AvatarFallback
             className={cn(
@@ -141,15 +141,15 @@ function ConversationItem({
 
       <div className="flex-1 min-w-0 text-left">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-medium text-sm truncate">{displayName}</span>
+          <span className="font-semibold text-sm truncate">{displayName}</span>
           {lastMessageTime && (
             <span className="text-xs text-muted-foreground flex-shrink-0">
               {lastMessageTime}
             </span>
           )}
         </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className="text-xs text-muted-foreground truncate">
+        <div className="flex items-center justify-between gap-2 mt-1">
+          <p className="text-sm text-muted-foreground truncate">
             {lastMessagePreview}
           </p>
           {unreadCount > 0 && (

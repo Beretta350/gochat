@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -58,27 +57,27 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
             <Image
               src="/gochat.svg"
               alt="GoChat"
-              width={32}
-              height={32}
-              className="w-8 h-8"
+              width={36}
+              height={36}
+              className="w-9 h-9"
             />
-            <span className="font-bold text-lg gradient-text">GoChat</span>
+            <span className="font-bold text-xl gradient-text">GoChat</span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             {/* Connection status */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <div
                   className={cn(
-                    "p-2 rounded-lg",
+                    "h-10 w-10 flex items-center justify-center rounded-lg",
                     isConnected ? "text-success" : "text-destructive"
                   )}
                 >
                   {isConnected ? (
-                    <Wifi className="w-4 h-4" />
+                    <Wifi className="w-5 h-5" />
                   ) : (
-                    <WifiOff className="w-4 h-4" />
+                    <WifiOff className="w-5 h-5" />
                   )}
                 </div>
               </TooltipTrigger>
@@ -93,6 +92,7 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="h-10 w-10"
                   onClick={() => setShowNewConversation(true)}
                 >
                   <MessageSquarePlus className="w-5 h-5" />
@@ -104,19 +104,17 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
         </div>
 
         {/* Search */}
-        <div className="px-4 pb-3">
+        <div className="p-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-muted border-0"
+              className="pl-10 h-11 bg-muted border-0 text-sm"
             />
           </div>
         </div>
-
-        <Separator />
 
         {/* Conversations list */}
         <ConversationList
@@ -124,16 +122,14 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
           currentUserId={user?.id || ""}
         />
 
-        <Separator />
-
         {/* User section */}
-        <div className="p-3">
-          <div className="flex items-center justify-between gap-2">
+        <div className="p-4">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <Avatar className="h-9 w-9 flex-shrink-0">
+              <Avatar className="h-11 w-11 flex-shrink-0">
                 <AvatarFallback
                   className={cn(
-                    "text-xs",
+                    "text-sm font-medium",
                     generateAvatarColor(user?.username || "U")
                   )}
                 >
@@ -141,20 +137,20 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate leading-tight">
+                <p className="text-sm font-semibold truncate">
                   {user?.username}
                 </p>
-                <p className="text-xs text-muted-foreground truncate leading-tight">
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
                   {user?.email}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Settings className="w-4 h-4" />
+                  <Button variant="ghost" size="icon" className="h-10 w-10">
+                    <Settings className="w-5 h-5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Settings</TooltipContent>
@@ -165,10 +161,10 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    className="h-10 w-10 text-destructive hover:text-destructive"
                     onClick={logout}
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="w-5 h-5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Logout</TooltipContent>
