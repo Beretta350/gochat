@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks";
 
 interface AuthGuardProps {
@@ -13,10 +13,15 @@ interface AuthGuardProps {
 export function AuthGuard({ children, requireAuth = true }: AuthGuardProps) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
-  const [showContent, setShowContent] = useState(!requireAuth);
+  const [showContent, setShowContent] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (isLoading) return;
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || isLoading) return;
 
     if (requireAuth && !isAuthenticated) {
       router.push("/login");
@@ -25,22 +30,18 @@ export function AuthGuard({ children, requireAuth = true }: AuthGuardProps) {
     } else {
       setShowContent(true);
     }
-  }, [isAuthenticated, isLoading, requireAuth, router]);
+  }, [isAuthenticated, isLoading, requireAuth, router, mounted]);
 
-  // For public pages (requireAuth=false), show content immediately
-  if (!requireAuth) {
+  // For public pages (requireAuth=false), show content immediately after mount
+  if (!requireAuth && mounted) {
     return <>{children}</>;
   }
 
-  // For protected pages, show loading while checking auth
-  if (isLoading || !showContent) {
+  // Show loading while checking auth or not mounted
+  if (!mounted || isLoading || !showContent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
-        />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }

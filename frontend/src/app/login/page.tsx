@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { motion } from "framer-motion";
-import { Loader2, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, Mail, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,9 @@ export default function LoginPage() {
   const { login, isLoginLoading, isAuthenticated, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authSuccess, setAuthSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     register,
@@ -35,23 +38,93 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  // Redirect if already authenticated
+  // Check authentication on page load
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      router.push("/chat");
+    if (!isLoading) {
+      if (isAuthenticated) {
+        // Already authenticated - show success and redirect
+        setAuthSuccess(true);
+        setTimeout(() => {
+          router.push("/chat");
+        }, 1000);
+      } else {
+        // Not authenticated - hide popup after 1.5s
+        setTimeout(() => {
+          setCheckingAuth(false);
+        }, 1500);
+      }
     }
   }, [isAuthenticated, isLoading, router]);
 
   const onSubmit = async (data: LoginForm) => {
     setError(null);
+    setIsSubmitting(true);
+    
     const result = await login(data);
-    if (!result.success) {
+    
+    if (result.success) {
+      setAuthSuccess(true);
+      setTimeout(() => {
+        router.push("/chat");
+      }, 1000);
+    } else {
+      setIsSubmitting(false);
       setError(result.error || "Login failed");
     }
   };
 
+  // Show checking auth popup
+  if (checkingAuth || authSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-card border border-border rounded-2xl p-8 shadow-xl flex flex-col items-center gap-4"
+        >
+          {authSuccess ? (
+            <>
+              <CheckCircle className="w-12 h-12 text-green-500" />
+              <p className="text-lg font-medium">Welcome back!</p>
+              <p className="text-sm text-muted-foreground">Redirecting to chat...</p>
+            </>
+          ) : (
+            <>
+              <Loader2 className="w-12 h-12 animate-spin text-primary" />
+              <p className="text-lg font-medium">Checking session...</p>
+              <p className="text-sm text-muted-foreground">Please wait</p>
+            </>
+          )}
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <AuthLayout>
+      {/* Submitting Overlay */}
+      <AnimatePresence>
+        {isSubmitting && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-card border border-border rounded-2xl p-8 shadow-xl flex flex-col items-center gap-4"
+            >
+              <Loader2 className="w-12 h-12 animate-spin text-primary" />
+              <p className="text-lg font-medium">Signing in...</p>
+              <p className="text-sm text-muted-foreground">Please wait</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="space-y-6">
         <div className="space-y-2 text-center">
           <h1 className="text-3xl font-bold">Welcome back</h1>
