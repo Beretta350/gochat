@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn, getInitials, generateAvatarColor } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import type { Message } from "@/types";
 
 interface MessageListProps {
@@ -121,10 +121,7 @@ function MessageBubble({ message, isSent, showAvatar, time }: MessageBubbleProps
           {showAvatar && (
             <Avatar className="h-8 w-8">
               <AvatarFallback
-                className={cn(
-                  "text-xs",
-                  generateAvatarColor(message.sender_username || "U")
-                )}
+                className="text-xs"
               >
                 {getInitials(message.sender_username || "U")}
               </AvatarFallback>

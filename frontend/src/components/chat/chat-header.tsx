@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { ChevronLeft, Phone, Video, MoreVertical, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { cn, getInitials, generateAvatarColor } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import type { Conversation } from "@/types";
 
 interface ChatHeaderProps {
@@ -63,10 +63,7 @@ export function ChatHeader({
         <div className="relative">
           <Avatar className="h-10 w-10">
             <AvatarFallback
-              className={cn(
-                "text-sm font-medium",
-                generateAvatarColor(displayName)
-              )}
+              className="text-sm font-medium"
             >
               {isGroup ? (
                 <Users className="w-4 h-4" />

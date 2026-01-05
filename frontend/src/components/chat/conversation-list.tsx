@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { MessageCircle, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn, formatDate, getInitials, generateAvatarColor } from "@/lib/utils";
+import { cn, formatDate, getInitials } from "@/lib/utils";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { setActiveConversation } from "@/store/slices/chatSlice";
 import type { Conversation } from "@/types";
@@ -122,10 +122,7 @@ function ConversationItem({
       <div className="relative flex-shrink-0">
         <Avatar className="h-12 w-12">
           <AvatarFallback
-            className={cn(
-              "text-sm font-medium",
-              generateAvatarColor(displayName)
-            )}
+            className="text-sm font-medium"
           >
             {isGroup ? (
               <Users className="w-5 h-5" />

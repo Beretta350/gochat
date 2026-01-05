@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ConversationList } from "./conversation-list";
 import { NewConversationDialog } from "./new-conversation-dialog";
-import { cn, getInitials, generateAvatarColor } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import { useAuth } from "@/hooks";
 import type { Conversation } from "@/types";
 
@@ -128,10 +128,7 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <Avatar className="h-11 w-11 flex-shrink-0">
                 <AvatarFallback
-                  className={cn(
-                    "text-sm font-medium",
-                    generateAvatarColor(user?.username || "U")
-                  )}
+                  className="text-sm font-medium"
                 >
                   {getInitials(user?.username || "User")}
                 </AvatarFallback>

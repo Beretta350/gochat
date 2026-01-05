@@ -37,17 +37,4 @@ export function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function generateAvatarColor(name: string): string {
-  const colors = [
-    "bg-primary",
-    "bg-secondary",
-    "bg-accent",
-    "bg-emerald-500",
-    "bg-violet-500",
-    "bg-orange-500",
-    "bg-pink-500",
-  ];
-  const index = name.charCodeAt(0) % colors.length;
-  return colors[index];
-}
 
