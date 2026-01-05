@@ -1,21 +1,51 @@
-MIT License
+PROPRIETARY LICENSE
 
-Copyright (c) 2024 Gabriel Beretta
+Copyright (c) 2024-2026 Gabriel Beretta. All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+NOTICE: This software and its source code are the exclusive property of 
+Gabriel Beretta ("Author"). This project is published for PORTFOLIO and 
+DEMONSTRATION purposes only.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. PERMISSIONS
+   You MAY:
+   - View the source code for educational purposes
+   - Reference this project in discussions about the Author's work
+   - Fork this repository for personal, non-commercial study ONLY
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. RESTRICTIONS
+   You MAY NOT:
+   - Use this software or any portion of its code in commercial applications
+   - Use this software as a base, template, or starting point for any product
+   - Copy, modify, merge, publish, distribute, sublicense, or sell copies
+   - Create derivative works based on this software
+   - Use this software in any revenue-generating context
+   - Remove or alter any copyright notices or this license
+
+3. COMMERCIAL USE
+   Any commercial use, including but not limited to:
+   - Using this code in a product or service
+   - Using this code as a foundation for a commercial application
+   - Incorporating any portion of this code into commercial software
+   
+   Requires PRIOR WRITTEN AUTHORIZATION from the Author and is subject to 
+   licensing fees to be negotiated.
+
+4. ENFORCEMENT
+   Unauthorized use of this software constitutes copyright infringement and 
+   may result in:
+   - Legal action for damages
+   - Injunctive relief
+   - Recovery of attorney fees and costs
+   - Statutory damages as provided by applicable copyright law
+
+5. NO WARRANTY
+   THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. THE AUTHOR 
+   SHALL NOT BE LIABLE FOR ANY DAMAGES ARISING FROM THE USE OR INABILITY TO 
+   USE THIS SOFTWARE.
+
+6. CONTACT
+   For licensing inquiries or commercial use requests, contact the Author at:
+   GitHub: https://github.com/Beretta350
+
+By accessing this repository, you acknowledge that you have read, understood, 
+and agree to be bound by the terms of this license.

@@ -212,5 +212,16 @@ make web-test            # Run frontend tests
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) for details.
+**⚠️ PROPRIETARY LICENSE - All Rights Reserved**
+
+This project is published for **portfolio and demonstration purposes only**.
+
+- ✅ View source code for educational purposes
+- ❌ Commercial use prohibited without authorization
+- ❌ Copying, modifying, or distributing prohibited
+- ❌ Using as base for other projects prohibited
+
+For licensing inquiries, contact: [GitHub](https://github.com/Beretta350)
+
+See [LICENSE](LICENSE) for full terms.
 
