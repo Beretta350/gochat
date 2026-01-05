@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -41,31 +40,16 @@ export default function HomePage() {
           </nav>
 
           {/* Hero Content */}
-          <div className="text-center max-w-4xl mx-auto">
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="text-5xl md:text-7xl font-bold tracking-tight mb-6"
-            >
+          <div className="text-center max-w-4xl mx-auto animate-fade-in">
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6">
               Chat in{" "}
               <span className="gradient-text">Real-Time</span>
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-xl text-foreground-muted mb-10 max-w-2xl mx-auto"
-            >
+            </h1>
+            <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">
               Connect instantly with friends and colleagues. Fast, secure, and
               beautifully designed for modern communication.
-            </motion.p>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="flex flex-col sm:flex-row gap-4 justify-center"
-            >
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/register">
                 <Button size="lg" className="w-full sm:w-auto text-lg px-8">
                   Start Chatting Free
@@ -80,16 +64,11 @@ export default function HomePage() {
                   Sign In
                 </Button>
               </Link>
-            </motion.div>
+            </div>
           </div>
 
           {/* Features */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="mt-24 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-          >
+          <div className="mt-24 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
             <FeatureCard
               icon={<Zap className="w-6 h-6" />}
               title="Lightning Fast"
@@ -110,7 +89,7 @@ export default function HomePage() {
               title="Multi-device"
               description="Stay connected across all your devices"
             />
-          </motion.div>
+          </div>
         </div>
       </div>
 
