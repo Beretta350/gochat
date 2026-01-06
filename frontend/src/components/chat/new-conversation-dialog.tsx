@@ -20,13 +20,28 @@ import { useAppDispatch } from "@/store";
 import { setActiveConversation, addConversation } from "@/store/slices/chatSlice";
 import { cn } from "@/lib/utils";
 
+// Helper to validate UUID
+const isValidUUID = (str: string) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
+// Helper to validate email
+const isValidEmail = (str: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(str);
+};
+
 const directSchema = z.object({
-  participant_id: z.string().uuid("Invalid user ID"),
+  participant: z.string().min(1, "User ID or email is required").refine(
+    (val) => isValidUUID(val) || isValidEmail(val),
+    "Must be a valid UUID or email address"
+  ),
 });
 
 const groupSchema = z.object({
   name: z.string().min(1, "Group name is required").max(50),
-  participant_ids: z.string().min(1, "At least one participant is required"),
+  participants: z.string().min(1, "At least one participant is required"),
 });
 
 type DirectForm = z.infer<typeof directSchema>;
@@ -57,9 +72,13 @@ export function NewConversationDialog({
   const handleDirectSubmit = async (data: DirectForm) => {
     setError(null);
     try {
-      const result = await createConversation({
-        participant_id: data.participant_id,
-      }).unwrap();
+      // Determine if input is UUID or email
+      const isUUID = isValidUUID(data.participant);
+      const result = await createConversation(
+        isUUID
+          ? { participant_id: data.participant }
+          : { participant_email: data.participant }
+      ).unwrap();
 
       dispatch(addConversation(result));
       dispatch(setActiveConversation(result.id));
@@ -74,21 +93,48 @@ export function NewConversationDialog({
   const handleGroupSubmit = async (data: GroupForm) => {
     setError(null);
     try {
-      // Parse comma-separated IDs
-      const ids = data.participant_ids
+      // Parse comma-separated values (can be UUIDs or emails)
+      const values = data.participants
         .split(",")
-        .map((id) => id.trim())
-        .filter((id) => id.length > 0);
+        .map((val) => val.trim())
+        .filter((val) => val.length > 0);
 
-      if (ids.length === 0) {
-        setError("At least one participant ID is required");
+      if (values.length === 0) {
+        setError("At least one participant is required");
         return;
       }
 
-      const result = await createConversation({
+      // Separate UUIDs and emails
+      const uuids: string[] = [];
+      const emails: string[] = [];
+      for (const val of values) {
+        if (isValidUUID(val)) {
+          uuids.push(val);
+        } else if (isValidEmail(val)) {
+          emails.push(val);
+        } else {
+          setError(`Invalid value: "${val}" is not a valid UUID or email`);
+          return;
+        }
+      }
+
+      // Build request - prefer emails if all are emails, otherwise use IDs
+      const requestBody: { name: string; participant_ids?: string[]; participant_emails?: string[] } = {
         name: data.name,
-        participant_ids: ids,
-      }).unwrap();
+      };
+
+      if (emails.length > 0 && uuids.length === 0) {
+        requestBody.participant_emails = emails;
+      } else if (uuids.length > 0 && emails.length === 0) {
+        requestBody.participant_ids = uuids;
+      } else {
+        // Mixed - send IDs (backend will need both handled, or we can just use IDs)
+        // For simplicity, if mixed, show error
+        setError("Please use either all UUIDs or all emails, not mixed");
+        return;
+      }
+
+      const result = await createConversation(requestBody).unwrap();
 
       dispatch(addConversation(result));
       dispatch(setActiveConversation(result.id));
@@ -157,19 +203,19 @@ export function NewConversationDialog({
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="participant_id">User ID</Label>
+              <Label htmlFor="participant">User ID or Email</Label>
               <Input
-                id="participant_id"
-                placeholder="Enter user UUID"
-                {...directForm.register("participant_id")}
+                id="participant"
+                placeholder="Enter UUID or email address"
+                {...directForm.register("participant")}
               />
-              {directForm.formState.errors.participant_id && (
+              {directForm.formState.errors.participant && (
                 <p className="text-sm text-destructive">
-                  {directForm.formState.errors.participant_id.message}
+                  {directForm.formState.errors.participant.message}
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
-                Enter the UUID of the user you want to chat with.
+                Enter the UUID or email of the user you want to chat with.
               </p>
             </div>
 
@@ -207,19 +253,19 @@ export function NewConversationDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="participant_ids">Participant IDs</Label>
+              <Label htmlFor="participants">Participants</Label>
               <Input
-                id="participant_ids"
-                placeholder="Enter UUIDs separated by commas"
-                {...groupForm.register("participant_ids")}
+                id="participants"
+                placeholder="Enter UUIDs or emails separated by commas"
+                {...groupForm.register("participants")}
               />
-              {groupForm.formState.errors.participant_ids && (
+              {groupForm.formState.errors.participants && (
                 <p className="text-sm text-destructive">
-                  {groupForm.formState.errors.participant_ids.message}
+                  {groupForm.formState.errors.participants.message}
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
-                Enter user UUIDs separated by commas.
+                Enter user UUIDs or email addresses separated by commas.
               </p>
             </div>
 
@@ -239,4 +285,5 @@ export function NewConversationDialog({
     </Dialog>
   );
 }
+
 

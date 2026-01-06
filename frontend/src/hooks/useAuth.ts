@@ -15,6 +15,7 @@ import {
   useLogoutMutation,
   useLazyGetMeQuery,
 } from "@/store/api/authApi";
+import { conversationsApi } from "@/store/api/conversationsApi";
 import type { LoginRequest, RegisterRequest } from "@/types";
 
 export function useAuth() {
@@ -108,6 +109,9 @@ export function useAuth() {
             user: response.user,
           })
         );
+
+        // Invalidate conversations cache to fetch the auto-created welcome chat
+        dispatch(conversationsApi.util.invalidateTags(["Conversations"]));
 
         router.push("/chat");
         return { success: true };
