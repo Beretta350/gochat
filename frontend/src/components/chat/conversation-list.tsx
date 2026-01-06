@@ -20,7 +20,7 @@ export function ConversationList({
   currentUserId,
 }: ConversationListProps) {
   const dispatch = useAppDispatch();
-  const { activeConversationId, unreadCounts } = useAppSelector(
+  const { activeConversationId, unreadCounts, onlineUsers } = useAppSelector(
     (state) => state.chat
   );
 
@@ -40,17 +40,28 @@ export function ConversationList({
             </p>
           </div>
         ) : (
-          conversations.map((conversation, index) => (
-            <ConversationItem
-              key={conversation.id}
-              conversation={conversation}
-              currentUserId={currentUserId}
-              isActive={activeConversationId === conversation.id}
-              unreadCount={unreadCounts[conversation.id] || 0}
-              index={index}
-              onClick={() => dispatch(setActiveConversation(conversation.id))}
-            />
-          ))
+          conversations.map((conversation, index) => {
+            // For direct conversations, check if the other user is online
+            const otherParticipant = conversation.type === "direct"
+              ? conversation.participants.find((p) => p.id !== currentUserId)
+              : null;
+            const isOtherUserOnline = otherParticipant
+              ? onlineUsers.includes(otherParticipant.id)
+              : false;
+
+            return (
+              <ConversationItem
+                key={conversation.id}
+                conversation={conversation}
+                currentUserId={currentUserId}
+                isActive={activeConversationId === conversation.id}
+                unreadCount={unreadCounts[conversation.id] || 0}
+                isOtherUserOnline={isOtherUserOnline}
+                index={index}
+                onClick={() => dispatch(setActiveConversation(conversation.id))}
+              />
+            );
+          })
         )}
       </div>
     </ScrollArea>
@@ -62,6 +73,7 @@ interface ConversationItemProps {
   currentUserId: string;
   isActive: boolean;
   unreadCount: number;
+  isOtherUserOnline: boolean;
   index: number;
   onClick: () => void;
 }
@@ -71,6 +83,7 @@ function ConversationItem({
   currentUserId,
   isActive,
   unreadCount,
+  isOtherUserOnline,
   index,
   onClick,
 }: ConversationItemProps) {
@@ -131,7 +144,7 @@ function ConversationItem({
             )}
           </AvatarFallback>
         </Avatar>
-        {!isGroup && (
+        {!isGroup && isOtherUserOnline && (
           <span className="absolute bottom-0 right-0 w-3 h-3 bg-success rounded-full border-2 border-background" />
         )}
       </div>

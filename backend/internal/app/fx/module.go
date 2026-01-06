@@ -31,6 +31,8 @@ var Module = fx.Options(
 
 	// Services
 	fx.Provide(chat.NewService),
+	// Provide ChatServiceInterface from chat.Service
+	fx.Provide(func(s *chat.Service) handler.ChatServiceInterface { return s }),
 
 	// Workers
 	fx.Provide(worker.NewMessageWorker),

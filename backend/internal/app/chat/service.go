@@ -68,19 +68,29 @@ type OutgoingMessage struct {
 	SentAt         int64  `json:"sent_at"`
 }
 
+// PresenceEvent represents an online/offline status change
+type PresenceEvent struct {
+	Type     string `json:"type"`     // "presence"
+	UserID   string `json:"user_id"`
+	Username string `json:"username,omitempty"`
+	Status   string `json:"status"`   // "online" or "offline"
+}
+
 // Service handles chat operations
 type Service struct {
 	redis    *redisclient.Client
 	convRepo repository.ConversationRepository
+	userRepo repository.UserRepository
 	users    *ConnectedUsers
 }
 
 // NewService creates a new chat service (Fx provider)
-func NewService(redis *redisclient.Client, convRepo repository.ConversationRepository) *Service {
+func NewService(redis *redisclient.Client, convRepo repository.ConversationRepository, userRepo repository.UserRepository) *Service {
 	logger.Info("Chat service initialized")
 	return &Service{
 		redis:    redis,
 		convRepo: convRepo,
+		userRepo: userRepo,
 		users:    NewConnectedUsers(),
 	}
 }
@@ -88,10 +98,18 @@ func NewService(redis *redisclient.Client, convRepo repository.ConversationRepos
 // HandleConnection handles a WebSocket connection
 func (s *Service) HandleConnection(ctx context.Context, conn *websocket.Conn, userID string) {
 	s.users.Add(userID, conn)
-	defer s.users.Remove(userID)
 
 	userCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
+
+	// Mark user as online in Redis and broadcast presence
+	s.handleUserOnline(userCtx, userID, conn)
+
+	defer func() {
+		cancel()
+		s.users.Remove(userID)
+		// Mark user as offline in Redis and broadcast presence
+		s.handleUserOffline(context.Background(), userID)
+	}()
 
 	// Deliver pending messages first
 	s.deliverPendingMessages(userCtx, conn, userID)
@@ -286,4 +304,147 @@ func (s *Service) sendError(conn *websocket.Conn, message string) {
 	}
 	msgBytes, _ := json.Marshal(errMsg)
 	_ = conn.WriteMessage(websocket.TextMessage, msgBytes)
+}
+
+// handleUserOnline marks user as online and broadcasts to their contacts
+func (s *Service) handleUserOnline(ctx context.Context, userID string, conn *websocket.Conn) {
+	// Mark online in Redis
+	if err := s.redis.SetUserOnline(ctx, userID); err != nil {
+		logger.Errorf("Error setting user %s online in Redis: %v", userID, err)
+	}
+
+	// Get user info for username
+	user, err := s.userRepo.GetByID(ctx, userID)
+	var username string
+	if err == nil && user != nil {
+		username = user.Username
+	}
+
+	// Get user's conversations to find contacts
+	conversations, err := s.convRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		logger.Errorf("Error getting conversations for user %s: %v", userID, err)
+		return
+	}
+
+	// Collect all unique contact IDs and send them initial online status
+	contactsSet := make(map[string]bool)
+	for _, conv := range conversations {
+		participants, err := s.convRepo.GetParticipants(ctx, conv.ID)
+		if err != nil {
+			continue
+		}
+		for _, p := range participants {
+			if p.UserID != userID {
+				contactsSet[p.UserID] = true
+			}
+		}
+	}
+
+	// Get list of online contacts to send to the connecting user
+	var contactIDs []string
+	for contactID := range contactsSet {
+		contactIDs = append(contactIDs, contactID)
+	}
+
+	// Send initial online users list to the connecting user
+	onlineContacts, err := s.redis.GetOnlineUsersFromList(ctx, contactIDs)
+	if err == nil && len(onlineContacts) > 0 {
+		initialStatus := map[string]interface{}{
+			"type":         "presence_list",
+			"online_users": onlineContacts,
+		}
+		if msgBytes, err := json.Marshal(initialStatus); err == nil {
+			_ = conn.WriteMessage(websocket.TextMessage, msgBytes)
+		}
+	}
+
+	// Broadcast online status to all contacts
+	presenceEvent := &PresenceEvent{
+		Type:     "presence",
+		UserID:   userID,
+		Username: username,
+		Status:   "online",
+	}
+	s.broadcastPresence(ctx, presenceEvent, contactIDs)
+}
+
+// handleUserOffline marks user as offline and broadcasts to their contacts
+func (s *Service) handleUserOffline(ctx context.Context, userID string) {
+	// Mark offline in Redis
+	if err := s.redis.SetUserOffline(ctx, userID); err != nil {
+		logger.Errorf("Error setting user %s offline in Redis: %v", userID, err)
+	}
+
+	// Get user info for username
+	user, err := s.userRepo.GetByID(ctx, userID)
+	var username string
+	if err == nil && user != nil {
+		username = user.Username
+	}
+
+	// Get user's conversations to find contacts
+	conversations, err := s.convRepo.GetByUserID(ctx, userID)
+	if err != nil {
+		logger.Errorf("Error getting conversations for user %s: %v", userID, err)
+		return
+	}
+
+	// Collect all unique contact IDs
+	contactsSet := make(map[string]bool)
+	for _, conv := range conversations {
+		participants, err := s.convRepo.GetParticipants(ctx, conv.ID)
+		if err != nil {
+			continue
+		}
+		for _, p := range participants {
+			if p.UserID != userID {
+				contactsSet[p.UserID] = true
+			}
+		}
+	}
+
+	var contactIDs []string
+	for contactID := range contactsSet {
+		contactIDs = append(contactIDs, contactID)
+	}
+
+	// Broadcast offline status to all contacts
+	presenceEvent := &PresenceEvent{
+		Type:     "presence",
+		UserID:   userID,
+		Username: username,
+		Status:   "offline",
+	}
+	s.broadcastPresence(ctx, presenceEvent, contactIDs)
+}
+
+// broadcastPresence sends presence event to specified users
+func (s *Service) broadcastPresence(ctx context.Context, event *PresenceEvent, userIDs []string) {
+	msgBytes, err := json.Marshal(event)
+	if err != nil {
+		logger.Errorf("Error marshaling presence event: %v", err)
+		return
+	}
+
+	for _, userID := range userIDs {
+		if s.users.IsOnline(userID) {
+			// User is online, publish to their channel
+			channel := "user:" + userID
+			if err := s.redis.Publish(ctx, channel, msgBytes); err != nil {
+				logger.Errorf("Error publishing presence to %s: %v", userID, err)
+			}
+		}
+		// Note: We don't queue presence events for offline users
+	}
+}
+
+// GetOnlineUsers returns the list of online user IDs (for API endpoint)
+func (s *Service) GetOnlineUsers(ctx context.Context) ([]string, error) {
+	return s.redis.GetOnlineUsers(ctx)
+}
+
+// GetOnlineUsersFromList checks which users from the list are online
+func (s *Service) GetOnlineUsersFromList(ctx context.Context, userIDs []string) ([]string, error) {
+	return s.redis.GetOnlineUsersFromList(ctx, userIDs)
 }

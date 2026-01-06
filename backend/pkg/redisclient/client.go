@@ -101,3 +101,56 @@ func (c *Client) ReadStreamGroup(ctx context.Context, group, consumer string, co
 func (c *Client) AckMessage(ctx context.Context, group, id string) error {
 	return c.rdb.XAck(ctx, "messages:stream", group, id).Err()
 }
+
+// ==================== Online Status Tracking ====================
+
+const onlineUsersKey = "online:users"
+
+// SetUserOnline marks a user as online
+func (c *Client) SetUserOnline(ctx context.Context, userID string) error {
+	return c.rdb.SAdd(ctx, onlineUsersKey, userID).Err()
+}
+
+// SetUserOffline marks a user as offline
+func (c *Client) SetUserOffline(ctx context.Context, userID string) error {
+	return c.rdb.SRem(ctx, onlineUsersKey, userID).Err()
+}
+
+// IsUserOnline checks if a user is online
+func (c *Client) IsUserOnline(ctx context.Context, userID string) (bool, error) {
+	return c.rdb.SIsMember(ctx, onlineUsersKey, userID).Result()
+}
+
+// GetOnlineUsers returns all online user IDs
+func (c *Client) GetOnlineUsers(ctx context.Context) ([]string, error) {
+	return c.rdb.SMembers(ctx, onlineUsersKey).Result()
+}
+
+// GetOnlineUsersFromList checks which users from the list are online
+func (c *Client) GetOnlineUsersFromList(ctx context.Context, userIDs []string) ([]string, error) {
+	if len(userIDs) == 0 {
+		return []string{}, nil
+	}
+
+	// Use pipeline to check multiple users efficiently
+	pipe := c.rdb.Pipeline()
+	cmds := make([]*redis.BoolCmd, len(userIDs))
+
+	for i, userID := range userIDs {
+		cmds[i] = pipe.SIsMember(ctx, onlineUsersKey, userID)
+	}
+
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var onlineUsers []string
+	for i, cmd := range cmds {
+		if cmd.Val() {
+			onlineUsers = append(onlineUsers, userIDs[i])
+		}
+	}
+
+	return onlineUsers, nil
+}

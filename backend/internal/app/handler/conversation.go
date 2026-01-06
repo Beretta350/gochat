@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -13,9 +14,15 @@ import (
 
 // ConversationHandler handles conversation endpoints
 type ConversationHandler struct {
-	convRepo repository.ConversationRepository
-	userRepo repository.UserRepository
-	msgRepo  repository.MessageRepository
+	convRepo    repository.ConversationRepository
+	userRepo    repository.UserRepository
+	msgRepo     repository.MessageRepository
+	chatService ChatServiceInterface
+}
+
+// ChatServiceInterface defines methods needed from chat service
+type ChatServiceInterface interface {
+	GetOnlineUsersFromList(ctx context.Context, userIDs []string) ([]string, error)
 }
 
 // NewConversationHandler creates a new conversation handler (Fx provider)
@@ -23,12 +30,14 @@ func NewConversationHandler(
 	convRepo repository.ConversationRepository,
 	userRepo repository.UserRepository,
 	msgRepo repository.MessageRepository,
+	chatService ChatServiceInterface,
 ) *ConversationHandler {
 	logger.Info("Conversation handler initialized")
 	return &ConversationHandler{
-		convRepo: convRepo,
-		userRepo: userRepo,
-		msgRepo:  msgRepo,
+		convRepo:    convRepo,
+		userRepo:    userRepo,
+		msgRepo:     msgRepo,
+		chatService: chatService,
 	}
 }
 
@@ -215,14 +224,20 @@ func (h *ConversationHandler) List(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to list conversations")
 	}
 
-	// Enrich with participants
+	// Enrich with participants and last message
 	result := make([]fiber.Map, 0, len(conversations))
 	for _, conv := range conversations {
 		participants, _ := h.convRepo.GetParticipants(c.Context(), conv.ID)
-		result = append(result, fiber.Map{
+		lastMessage, _ := h.msgRepo.GetLastMessage(c.Context(), conv.ID)
+
+		convData := fiber.Map{
 			"conversation": conv,
 			"participants": toParticipantResponses(participants),
-		})
+		}
+		if lastMessage != nil {
+			convData["last_message"] = lastMessage
+		}
+		result = append(result, convData)
 	}
 
 	return c.JSON(fiber.Map{
@@ -320,4 +335,54 @@ func (h *ConversationHandler) GetMessages(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(page)
+}
+
+// GetOnlineStatus returns online status for participants of a conversation
+// GET /api/v1/conversations/:id/online
+func (h *ConversationHandler) GetOnlineStatus(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	convID := c.Params("id")
+
+	// Verify user is participant
+	participants, err := h.convRepo.GetParticipants(c.Context(), convID)
+	if err != nil {
+		if errors.Is(err, repository.ErrConversationNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "Conversation not found")
+		}
+		return fiber.NewError(fiber.StatusInternalServerError, "Failed to verify access")
+	}
+
+	isParticipant := false
+	var participantIDs []string
+	for _, p := range participants {
+		if p.UserID == userID {
+			isParticipant = true
+		}
+		participantIDs = append(participantIDs, p.UserID)
+	}
+
+	if !isParticipant {
+		return fiber.NewError(fiber.StatusForbidden, "You are not a participant of this conversation")
+	}
+
+	// Get online users from the participant list
+	onlineUsers, err := h.chatService.GetOnlineUsersFromList(c.Context(), participantIDs)
+	if err != nil {
+		logger.Errorf("Failed to get online status: %v", err)
+		return fiber.NewError(fiber.StatusInternalServerError, "Failed to get online status")
+	}
+
+	// Build response map
+	onlineMap := make(map[string]bool)
+	for _, id := range participantIDs {
+		onlineMap[id] = false
+	}
+	for _, id := range onlineUsers {
+		onlineMap[id] = true
+	}
+
+	return c.JSON(fiber.Map{
+		"online_users": onlineUsers,
+		"status":       onlineMap,
+	})
 }

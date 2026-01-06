@@ -6,6 +6,7 @@ import { ChevronLeft, Phone, Video, MoreVertical, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn, getInitials } from "@/lib/utils";
+import { useAppSelector } from "@/store";
 import type { Conversation } from "@/types";
 
 interface ChatHeaderProps {
@@ -21,24 +22,31 @@ export function ChatHeader({
   isConnected,
   onBack,
 }: ChatHeaderProps) {
-  const { displayName, subtitle, isGroup } = useMemo(() => {
+  const { onlineUsers } = useAppSelector((state) => state.chat);
+
+  const { displayName, subtitle, isGroup, isOtherUserOnline } = useMemo(() => {
     if (conversation.type === "group") {
       return {
         displayName: conversation.name || "Group Chat",
         subtitle: `${conversation.participants.length} members`,
         isGroup: true,
+        isOtherUserOnline: false,
       };
     }
 
     const otherParticipant = conversation.participants.find(
       (p) => p.id !== currentUserId
     );
+    const isOnline = otherParticipant
+      ? onlineUsers.includes(otherParticipant.id)
+      : false;
     return {
       displayName: otherParticipant?.username || "Unknown User",
-      subtitle: isConnected ? "Online" : "Offline",
+      subtitle: isOnline ? "Online" : "Offline",
       isGroup: false,
+      isOtherUserOnline: isOnline,
     };
-  }, [conversation, currentUserId, isConnected]);
+  }, [conversation, currentUserId, onlineUsers]);
 
   return (
     <m.div
@@ -72,7 +80,7 @@ export function ChatHeader({
               )}
             </AvatarFallback>
           </Avatar>
-          {!isGroup && isConnected && (
+          {!isGroup && isOtherUserOnline && (
             <span className="absolute bottom-0 right-0 w-3 h-3 bg-success rounded-full border-2 border-background" />
           )}
         </div>
@@ -83,7 +91,7 @@ export function ChatHeader({
           <p
             className={cn(
               "text-xs",
-              !isGroup && isConnected
+              !isGroup && isOtherUserOnline
                 ? "text-success"
                 : "text-muted-foreground"
             )}
