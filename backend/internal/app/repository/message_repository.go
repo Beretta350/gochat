@@ -22,6 +22,7 @@ type MessageRepository interface {
 	CreateBatch(ctx context.Context, msgs []*model.Message) error
 	GetByID(ctx context.Context, id string) (*model.Message, error)
 	GetByConversation(ctx context.Context, conversationID string, cursor *time.Time, limit int) (*model.MessagesPage, error)
+	GetLastMessage(ctx context.Context, conversationID string) (*model.Message, error)
 }
 
 // PostgresMessageRepository implements MessageRepository with PostgreSQL
@@ -197,4 +198,34 @@ func (r *PostgresMessageRepository) GetByConversation(ctx context.Context, conve
 		HasMore:    hasMore,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+func (r *PostgresMessageRepository) GetLastMessage(ctx context.Context, conversationID string) (*model.Message, error) {
+	query := `
+		SELECT m.id, m.conversation_id, m.sender_id, u.username, m.content, m.type, m.sent_at
+		FROM messages m
+		JOIN users u ON m.sender_id = u.id
+		WHERE m.conversation_id = $1
+		ORDER BY m.sent_at DESC
+		LIMIT 1
+	`
+	var msg model.Message
+
+	err := r.db.Pool.QueryRow(ctx, query, conversationID).Scan(
+		&msg.ID,
+		&msg.ConversationID,
+		&msg.SenderID,
+		&msg.SenderUsername,
+		&msg.Content,
+		&msg.Type,
+		&msg.SentAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil // No messages yet, not an error
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &msg, nil
 }

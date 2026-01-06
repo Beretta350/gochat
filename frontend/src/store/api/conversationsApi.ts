@@ -4,6 +4,7 @@ import type {
   Conversation,
   CreateConversationRequest,
   MessagesPage,
+  Message,
   Participant,
 } from "@/types";
 
@@ -17,6 +18,7 @@ interface ConversationResponse {
     updated_at: string;
   };
   participants: Participant[];
+  last_message?: Message;
 }
 
 interface GetConversationsResponse {
@@ -38,6 +40,7 @@ export const conversationsApi = createApi({
           type: item.conversation.type,
           name: item.conversation.name,
           participants: item.participants,
+          last_message: item.last_message,
           created_at: item.conversation.created_at,
           updated_at: item.conversation.updated_at,
         }));

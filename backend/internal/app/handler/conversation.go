@@ -224,14 +224,20 @@ func (h *ConversationHandler) List(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, "Failed to list conversations")
 	}
 
-	// Enrich with participants
+	// Enrich with participants and last message
 	result := make([]fiber.Map, 0, len(conversations))
 	for _, conv := range conversations {
 		participants, _ := h.convRepo.GetParticipants(c.Context(), conv.ID)
-		result = append(result, fiber.Map{
+		lastMessage, _ := h.msgRepo.GetLastMessage(c.Context(), conv.ID)
+
+		convData := fiber.Map{
 			"conversation": conv,
 			"participants": toParticipantResponses(participants),
-		})
+		}
+		if lastMessage != nil {
+			convData["last_message"] = lastMessage
+		}
+		result = append(result, convData)
 	}
 
 	return c.JSON(fiber.Map{
