@@ -119,6 +119,7 @@ func setupRoutes(app *fiber.App, p ServerParams) {
 	convGroup.Get("/", p.Conversation.List)
 	convGroup.Get("/:id", p.Conversation.Get)
 	convGroup.Get("/:id/messages", p.Conversation.GetMessages)
+	convGroup.Get("/:id/online", p.Conversation.GetOnlineStatus)
 
 	// WebSocket routes (JWT in query string)
 	ws := app.Group("/ws")
