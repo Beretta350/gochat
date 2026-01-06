@@ -18,6 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { WipDialog } from "@/components/ui/wip-dialog";
 import { ConversationList } from "./conversation-list";
 import { NewConversationDialog } from "./new-conversation-dialog";
 import { cn, getInitials } from "@/lib/utils";
@@ -33,6 +34,7 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
   const { user, logout } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewConversation, setShowNewConversation] = useState(false);
+  const [showWip, setShowWip] = useState(false);
 
   const filteredConversations = conversations.filter((conv) => {
     if (!searchQuery) return true;
@@ -145,7 +147,12 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
             <div className="flex items-center gap-2 flex-shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-10 w-10">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10"
+                    onClick={() => setShowWip(true)}
+                  >
                     <Settings className="w-5 h-5" />
                   </Button>
                 </TooltipTrigger>
@@ -174,6 +181,13 @@ export function Sidebar({ conversations, isConnected }: SidebarProps) {
       <NewConversationDialog
         open={showNewConversation}
         onOpenChange={setShowNewConversation}
+      />
+
+      {/* Work in Progress dialog */}
+      <WipDialog
+        open={showWip}
+        onOpenChange={setShowWip}
+        feature="Settings"
       />
     </>
   );

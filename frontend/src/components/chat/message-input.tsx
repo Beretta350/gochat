@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import { Send, Smile, Paperclip } from "lucide-react";
 import { m } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { WipDialog } from "@/components/ui/wip-dialog";
 import { cn } from "@/lib/utils";
 
 interface MessageInputProps {
@@ -18,7 +19,14 @@ export function MessageInput({
   placeholder = "Type a message...",
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
+  const [wipOpen, setWipOpen] = useState(false);
+  const [wipFeature, setWipFeature] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const openWip = (feature: string) => {
+    setWipFeature(feature);
+    setWipOpen(true);
+  };
 
   const handleSubmit = useCallback(() => {
     const trimmedMessage = message.trim();
@@ -63,6 +71,7 @@ export function MessageInput({
           size="icon"
           className="flex-shrink-0 h-10 w-10 text-muted-foreground hover:text-foreground"
           disabled={disabled}
+          onClick={() => openWip("File Attachments")}
         >
           <Paperclip className="w-5 h-5" />
         </Button>
@@ -94,6 +103,7 @@ export function MessageInput({
             size="icon"
             className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
             disabled={disabled}
+            onClick={() => openWip("Emoji Picker")}
           >
             <Smile className="w-5 h-5" />
           </Button>
@@ -120,6 +130,8 @@ export function MessageInput({
           </Button>
         </m.div>
       </div>
+
+      <WipDialog open={wipOpen} onOpenChange={setWipOpen} feature={wipFeature} />
     </div>
   );
 }
