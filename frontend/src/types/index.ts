@@ -64,7 +64,9 @@ export interface Conversation {
 
 export interface CreateConversationRequest {
   participant_id?: string;
+  participant_email?: string;
   participant_ids?: string[];
+  participant_emails?: string[];
   name?: string;
 }
 

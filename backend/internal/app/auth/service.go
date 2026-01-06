@@ -9,6 +9,9 @@ import (
 	"github.com/Beretta350/gochat/pkg/logger"
 )
 
+// DefaultChatUserEmail is the email of the user that all new users should have a direct chat with
+const DefaultChatUserEmail = "beretta.gabrielpp@gmail.com"
+
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrEmailAlreadyExists = errors.New("email already exists")
@@ -18,14 +21,16 @@ var (
 // Service handles authentication operations
 type Service struct {
 	userRepo   repository.UserRepository
+	convRepo   repository.ConversationRepository
 	jwtService *JWTService
 }
 
 // NewService creates a new auth service (Fx provider)
-func NewService(userRepo repository.UserRepository, jwtService *JWTService) *Service {
+func NewService(userRepo repository.UserRepository, convRepo repository.ConversationRepository, jwtService *JWTService) *Service {
 	logger.Info("Auth service initialized")
 	return &Service{
 		userRepo:   userRepo,
+		convRepo:   convRepo,
 		jwtService: jwtService,
 	}
 }
@@ -91,10 +96,52 @@ func (s *Service) Register(ctx context.Context, req *RegisterRequest) (*AuthResp
 
 	logger.Infof("User registered: %s", user.Email)
 
+	// Auto-create direct chat with Gabriel if:
+	// 1. The registering user is NOT Gabriel
+	// 2. Gabriel's user exists in the system
+	if req.Email != DefaultChatUserEmail {
+		s.createDefaultDirectChat(ctx, user.ID)
+	}
+
 	return &AuthResponse{
 		User:   user.ToResponse(),
 		Tokens: tokens,
 	}, nil
+}
+
+// createDefaultDirectChat creates a direct conversation between the new user and Gabriel
+func (s *Service) createDefaultDirectChat(ctx context.Context, newUserID string) {
+	// Check if Gabriel's user exists
+	gabriel, err := s.userRepo.GetByEmail(ctx, DefaultChatUserEmail)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			logger.Info("Default chat user (Gabriel) not found, skipping auto-chat creation")
+			return
+		}
+		logger.Errorf("Error checking default chat user: %v", err)
+		return
+	}
+
+	// Check if a direct conversation already exists
+	_, err = s.convRepo.FindDirectConversation(ctx, newUserID, gabriel.ID)
+	if err == nil {
+		// Conversation already exists
+		logger.Infof("Direct conversation with Gabriel already exists for user %s", newUserID)
+		return
+	}
+
+	// Create direct conversation
+	conv := &model.Conversation{
+		Type: model.ConversationTypeDirect,
+	}
+	participantIDs := []string{newUserID, gabriel.ID}
+
+	if err := s.convRepo.Create(ctx, conv, participantIDs); err != nil {
+		logger.Errorf("Failed to create default direct chat: %v", err)
+		return
+	}
+
+	logger.Infof("Auto-created direct chat between new user %s and Gabriel", newUserID)
 }
 
 // Login authenticates a user and returns tokens

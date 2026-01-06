@@ -44,14 +44,18 @@ func toParticipantResponses(participants []model.Participant) []*model.Participa
 }
 
 // CreateDirectRequest represents a request to create a direct conversation
+// Accepts either participant_id (UUID) or participant_email
 type CreateDirectRequest struct {
-	ParticipantID string `json:"participant_id" validate:"required"`
+	ParticipantID    string `json:"participant_id"`
+	ParticipantEmail string `json:"participant_email"`
 }
 
 // CreateGroupRequest represents a request to create a group conversation
+// Accepts either participant_ids (UUIDs) or participant_emails
 type CreateGroupRequest struct {
-	Name           string   `json:"name" validate:"required"`
-	ParticipantIDs []string `json:"participant_ids" validate:"required,min=1"`
+	Name              string   `json:"name" validate:"required"`
+	ParticipantIDs    []string `json:"participant_ids"`
+	ParticipantEmails []string `json:"participant_emails"`
 }
 
 // Create creates a new conversation (direct or group)
@@ -61,8 +65,20 @@ func (h *ConversationHandler) Create(c *fiber.Ctx) error {
 
 	// Try to parse as direct conversation first
 	var directReq CreateDirectRequest
-	if err := c.BodyParser(&directReq); err == nil && directReq.ParticipantID != "" {
-		return h.createDirect(c, userID, directReq.ParticipantID)
+	if err := c.BodyParser(&directReq); err == nil && (directReq.ParticipantID != "" || directReq.ParticipantEmail != "") {
+		// Resolve participant ID from email if needed
+		participantID := directReq.ParticipantID
+		if participantID == "" && directReq.ParticipantEmail != "" {
+			user, err := h.userRepo.GetByEmail(c.Context(), directReq.ParticipantEmail)
+			if err != nil {
+				if errors.Is(err, repository.ErrUserNotFound) {
+					return fiber.NewError(fiber.StatusNotFound, "User with email not found")
+				}
+				return fiber.NewError(fiber.StatusInternalServerError, "Failed to find user")
+			}
+			participantID = user.ID
+		}
+		return h.createDirect(c, userID, participantID)
 	}
 
 	// Try to parse as group conversation
@@ -73,6 +89,25 @@ func (h *ConversationHandler) Create(c *fiber.Ctx) error {
 
 	if groupReq.Name == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "Group name is required")
+	}
+
+	// Resolve participant IDs from emails if needed
+	if len(groupReq.ParticipantIDs) == 0 && len(groupReq.ParticipantEmails) > 0 {
+		groupReq.ParticipantIDs = make([]string, 0, len(groupReq.ParticipantEmails))
+		for _, email := range groupReq.ParticipantEmails {
+			user, err := h.userRepo.GetByEmail(c.Context(), email)
+			if err != nil {
+				if errors.Is(err, repository.ErrUserNotFound) {
+					return fiber.NewError(fiber.StatusNotFound, "User with email not found: "+email)
+				}
+				return fiber.NewError(fiber.StatusInternalServerError, "Failed to find user")
+			}
+			groupReq.ParticipantIDs = append(groupReq.ParticipantIDs, user.ID)
+		}
+	}
+
+	if len(groupReq.ParticipantIDs) == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "At least one participant is required")
 	}
 
 	return h.createGroup(c, userID, &groupReq)

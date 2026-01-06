@@ -42,6 +42,10 @@ frontend/.next/
 frontend/out/
 frontend/dist/
 
+# TypeScript cache
+*.tsbuildinfo
+frontend/*.tsbuildinfo
+
 # Testing
 frontend/coverage/
 
@@ -49,6 +53,16 @@ frontend/coverage/
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+
+# Linting cache
+frontend/.eslintcache
+
+# Vercel
+frontend/.vercel/
+
+# Turbo
+frontend/.turbo/
 
 # ========================
 # Environment
@@ -71,6 +85,16 @@ backend/configs/*.env
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
+
+# ========================
+# Cursor AI
+# ========================
+
+.cursor/
+.cursorignore
 
 # ========================
 # OS
@@ -91,3 +115,27 @@ logs/
 # ========================
 
 backend/scripts/dev/*
+
+# ========================
+# Docker
+# ========================
+
+# Docker compose override for local development
+docker-compose.override.yml
+docker-compose.local.yml
+
+# ========================
+# Misc
+# ========================
+
+# Local database data (if mounting volumes locally)
+.data/
+data/
+postgres-data/
+redis-data/
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
