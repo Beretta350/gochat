@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { m } from "framer-motion";
 import { ChevronLeft, Phone, Video, MoreVertical, Users } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { WipDialog } from "@/components/ui/wip-dialog";
 import { cn, getInitials } from "@/lib/utils";
 import { useAppSelector } from "@/store";
 import type { Conversation } from "@/types";
@@ -23,6 +24,13 @@ export function ChatHeader({
   onBack,
 }: ChatHeaderProps) {
   const { onlineUsers } = useAppSelector((state) => state.chat);
+  const [wipOpen, setWipOpen] = useState(false);
+  const [wipFeature, setWipFeature] = useState("");
+
+  const openWip = (feature: string) => {
+    setWipFeature(feature);
+    setWipOpen(true);
+  };
 
   const { displayName, subtitle, isGroup, isOtherUserOnline } = useMemo(() => {
     if (conversation.type === "group") {
@@ -107,6 +115,7 @@ export function ChatHeader({
           variant="ghost"
           size="icon"
           className="text-muted-foreground hover:text-foreground"
+          onClick={() => openWip("Voice Call")}
         >
           <Phone className="w-5 h-5" />
         </Button>
@@ -114,6 +123,7 @@ export function ChatHeader({
           variant="ghost"
           size="icon"
           className="text-muted-foreground hover:text-foreground"
+          onClick={() => openWip("Video Call")}
         >
           <Video className="w-5 h-5" />
         </Button>
@@ -121,10 +131,13 @@ export function ChatHeader({
           variant="ghost"
           size="icon"
           className="text-muted-foreground hover:text-foreground"
+          onClick={() => openWip("More Options")}
         >
           <MoreVertical className="w-5 h-5" />
         </Button>
       </div>
+
+      <WipDialog open={wipOpen} onOpenChange={setWipOpen} feature={wipFeature} />
     </m.div>
   );
 }
