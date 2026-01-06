@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { addMessage, setConnected } from "@/store/slices/chatSlice";
-import type { WebSocketMessage, SendMessageRequest } from "@/types";
+import { addMessage, setConnected, setOnlineUsers, setUserOnlineStatus } from "@/store/slices/chatSlice";
+import type { WebSocketMessage, SendMessageRequest, PresenceEvent, PresenceListEvent } from "@/types";
 
 export function useWebSocket() {
   const dispatch = useAppDispatch();
@@ -38,6 +38,25 @@ export function useWebSocket() {
           // Check if it's an error message
           if (data.error) {
             console.error("WebSocket error:", data.message);
+            return;
+          }
+
+          // Handle presence list (initial online users on connect)
+          if (data.type === "presence_list") {
+            const presenceList = data as PresenceListEvent;
+            dispatch(setOnlineUsers(presenceList.online_users || []));
+            return;
+          }
+
+          // Handle presence event (user online/offline)
+          if (data.type === "presence") {
+            const presence = data as PresenceEvent;
+            dispatch(
+              setUserOnlineStatus({
+                userId: presence.user_id,
+                isOnline: presence.status === "online",
+              })
+            );
             return;
           }
 

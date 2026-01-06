@@ -8,6 +8,7 @@ interface ChatState {
   typingUsers: Record<string, string[]>; // conversationId -> userIds
   isConnected: boolean;
   unreadCounts: Record<string, number>;
+  onlineUsers: string[]; // List of online user IDs
 }
 
 const initialState: ChatState = {
@@ -17,6 +18,7 @@ const initialState: ChatState = {
   typingUsers: {},
   isConnected: false,
   unreadCounts: {},
+  onlineUsers: [],
 };
 
 const chatSlice = createSlice({
@@ -125,9 +127,31 @@ const chatSlice = createSlice({
     },
     setConnected: (state, action: PayloadAction<boolean>) => {
       state.isConnected = action.payload;
+      // Clear online users when disconnected
+      if (!action.payload) {
+        state.onlineUsers = [];
+      }
     },
     clearUnread: (state, action: PayloadAction<string>) => {
       state.unreadCounts[action.payload] = 0;
+    },
+    // Set initial list of online users (received on WebSocket connect)
+    setOnlineUsers: (state, action: PayloadAction<string[]>) => {
+      state.onlineUsers = action.payload;
+    },
+    // Update single user's online status
+    setUserOnlineStatus: (
+      state,
+      action: PayloadAction<{ userId: string; isOnline: boolean }>
+    ) => {
+      const { userId, isOnline } = action.payload;
+      if (isOnline) {
+        if (!state.onlineUsers.includes(userId)) {
+          state.onlineUsers.push(userId);
+        }
+      } else {
+        state.onlineUsers = state.onlineUsers.filter((id) => id !== userId);
+      }
     },
   },
 });
@@ -143,6 +167,8 @@ export const {
   setTypingUser,
   setConnected,
   clearUnread,
+  setOnlineUsers,
+  setUserOnlineStatus,
 } = chatSlice.actions;
 export default chatSlice.reducer;
 

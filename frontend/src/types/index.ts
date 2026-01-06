@@ -92,6 +92,19 @@ export interface WebSocketError {
   message: string;
 }
 
+// Presence types
+export interface PresenceEvent {
+  type: "presence";
+  user_id: string;
+  username?: string;
+  status: "online" | "offline";
+}
+
+export interface PresenceListEvent {
+  type: "presence_list";
+  online_users: string[];
+}
+
 export interface SendMessageRequest {
   conversation_id: string;
   content: string;
