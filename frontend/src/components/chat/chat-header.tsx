@@ -13,14 +13,12 @@ import type { Conversation } from "@/types";
 interface ChatHeaderProps {
   conversation: Conversation;
   currentUserId: string;
-  isConnected: boolean;
   onBack?: () => void;
 }
 
 export function ChatHeader({
   conversation,
   currentUserId,
-  isConnected,
   onBack,
 }: ChatHeaderProps) {
   const { onlineUsers } = useAppSelector((state) => state.chat);

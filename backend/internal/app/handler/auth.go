@@ -9,6 +9,7 @@ import (
 	"github.com/Beretta350/gochat/internal/app/auth"
 	"github.com/Beretta350/gochat/internal/config"
 	"github.com/Beretta350/gochat/pkg/logger"
+	"github.com/Beretta350/gochat/pkg/validator"
 )
 
 const (
@@ -97,13 +98,16 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	// Basic validation
-	if req.Email == "" || req.Username == "" || req.Password == "" {
-		return fiber.NewError(fiber.StatusBadRequest, "Email, username and password are required")
-	}
+	// Sanitize inputs
+	req.Email = validator.SanitizeString(req.Email)
+	req.Username = validator.SanitizeString(req.Username)
 
-	if len(req.Password) < 8 {
-		return fiber.NewError(fiber.StatusBadRequest, "Password must be at least 8 characters")
+	// Validate struct using go-playground/validator
+	if validationErrors := validator.Struct(&req); len(validationErrors) > 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":  "Validation failed",
+			"errors": validationErrors,
+		})
 	}
 
 	response, err := h.authService.Register(c.Context(), &req)
@@ -134,8 +138,15 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body")
 	}
 
-	if req.Email == "" || req.Password == "" {
-		return fiber.NewError(fiber.StatusBadRequest, "Email and password are required")
+	// Sanitize email
+	req.Email = validator.SanitizeString(req.Email)
+
+	// Validate struct using go-playground/validator
+	if validationErrors := validator.Struct(&req); len(validationErrors) > 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":  "Validation failed",
+			"errors": validationErrors,
+		})
 	}
 
 	response, err := h.authService.Login(c.Context(), &req)
