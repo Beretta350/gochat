@@ -10,10 +10,12 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+
+	"github.com/Beretta350/gochat/internal/config"
 )
 
 // Setup configures all middlewares for the application
-func Setup(app *fiber.App) {
+func Setup(app *fiber.App, cfg *config.Config) {
 	// Recover from panics
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
@@ -41,12 +43,12 @@ func Setup(app *fiber.App) {
 		ReferrerPolicy:        "strict-origin-when-cross-origin",
 	}))
 
-	// CORS
+	// CORS - configured via config
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
+		AllowOrigins:     cfg.CORS.AllowedOrigins,
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Request-ID",
-		AllowCredentials: false,
+		AllowCredentials: true,
 		MaxAge:           86400,
 	}))
 

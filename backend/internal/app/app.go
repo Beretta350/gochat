@@ -53,7 +53,7 @@ func startServer(p ServerParams) {
 	})
 
 	// Setup middlewares
-	middleware.Setup(app)
+	middleware.Setup(app, p.Config)
 
 	// Setup routes
 	setupRoutes(app, p)

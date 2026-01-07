@@ -26,6 +26,12 @@ type Config struct {
 	Redis    RedisConfig
 	JWT      JWTConfig
 	Cookie   CookieConfig
+	CORS     CORSConfig
+}
+
+// CORSConfig holds CORS configuration
+type CORSConfig struct {
+	AllowedOrigins string
 }
 
 // ServerConfig holds the server configuration
@@ -43,6 +49,7 @@ type RedisConfig struct {
 	Addr     string
 	Password string
 	DB       int
+	TLS      bool // Enable TLS for cloud Redis (Upstash, etc.)
 }
 
 // JWTConfig holds JWT configuration
@@ -86,6 +93,7 @@ func NewConfig() (*Config, error) {
 			Addr:     envutil.GetEnv("REDIS_ADDR", "localhost:6379"),
 			Password: envutil.GetEnv("REDIS_PASSWORD", ""),
 			DB:       envutil.GetEnvInt("REDIS_DB", 0),
+			TLS:      envutil.GetEnvBool("REDIS_TLS", false), // true for Upstash/cloud Redis
 		},
 		JWT: JWTConfig{
 			Secret:        envutil.GetEnv("JWT_SECRET", "your-super-secret-key-change-in-production"),
@@ -96,6 +104,9 @@ func NewConfig() (*Config, error) {
 			Domain:   envutil.GetEnv("COOKIE_DOMAIN", "localhost"),
 			Secure:   envutil.GetEnvBool("COOKIE_SECURE", false), // true em produção (HTTPS)
 			SameSite: envutil.GetEnv("COOKIE_SAMESITE", "Lax"),
+		},
+		CORS: CORSConfig{
+			AllowedOrigins: envutil.GetEnv("ALLOWED_ORIGINS", "http://localhost:3000"),
 		},
 	}
 

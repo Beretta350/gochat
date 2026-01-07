@@ -2,6 +2,7 @@ package redisclient
 
 import (
 	"context"
+	"crypto/tls"
 
 	"github.com/redis/go-redis/v9"
 
@@ -16,11 +17,20 @@ type Client struct {
 
 // NewClient creates a new Redis client (Fx provider)
 func NewClient(cfg *config.Config) (*Client, error) {
-	rdb := redis.NewClient(&redis.Options{
+	opts := &redis.Options{
 		Addr:     cfg.Redis.Addr,
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
-	})
+	}
+
+	// Enable TLS for cloud Redis providers (Upstash, etc.)
+	if cfg.Redis.TLS {
+		opts.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+	}
+
+	rdb := redis.NewClient(opts)
 
 	// Test connection
 	ctx := context.Background()
