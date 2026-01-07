@@ -105,7 +105,7 @@ func setupRoutes(app *fiber.App, p ServerParams) {
 
 	// Auth routes (public)
 	authGroup := api.Group("/auth")
-	authGroup.Post("/register", p.Auth.Register)
+	authGroup.Post("/register", middleware.StrictRateLimiter(), p.Auth.Register)
 	authGroup.Post("/login", p.Auth.Login)
 	authGroup.Post("/refresh", p.Auth.Refresh)
 	authGroup.Post("/logout", p.Auth.Logout)

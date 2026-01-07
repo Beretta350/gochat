@@ -1,7 +1,7 @@
 "use client";
 
 import { Construction } from "lucide-react";
-import { m, AnimatePresence } from "framer-motion";
+import { m } from "framer-motion";
 import {
   Dialog,
   DialogContent,
