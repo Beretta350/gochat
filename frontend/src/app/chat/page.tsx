@@ -158,7 +158,6 @@ function ChatContent() {
               <ChatHeader
                 conversation={activeConversation}
                 currentUserId={user?.id || ""}
-                isConnected={isConnected}
                 onBack={handleBack}
               />
 
