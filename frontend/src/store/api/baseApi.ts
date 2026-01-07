@@ -6,9 +6,10 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import { logout } from "../slices/authSlice";
 
-// Com Next.js rewrites, usamos URLs relativas (mesmo origin)
+// API URL - use env var in production, relative in dev
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: "/api/v1",
+  baseUrl: `${apiUrl}/api/v1`,
   credentials: "include", // Envia cookies automaticamente
   prepareHeaders: (headers) => {
     headers.set("Content-Type", "application/json");

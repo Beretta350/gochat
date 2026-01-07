@@ -19,9 +19,14 @@ export function useWebSocket() {
     }
 
     try {
-      // Use relative URL with Next.js proxy - cookies are sent automatically
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      // Use env var in production, relative URL in dev
+      let wsUrl: string;
+      if (process.env.NEXT_PUBLIC_WS_URL) {
+        wsUrl = process.env.NEXT_PUBLIC_WS_URL;
+      } else {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        wsUrl = `${protocol}//${window.location.host}/ws`;
+      }
 
       const ws = new WebSocket(wsUrl);
 
