@@ -7,7 +7,7 @@ app = 'gochat'
 primary_region = 'gru'
 
 [build]
-  dockerfile = 'deploy/Dockerfile'
+  dockerfile = 'Dockerfile.fly'
 
 [env]
   COOKIE_SAMESITE = 'Lax'

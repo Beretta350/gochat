@@ -57,10 +57,10 @@ COPY --from=frontend-builder /app/.next/static /app/frontend/.next/static
 COPY --from=frontend-builder /app/public /app/frontend/public
 
 # Copy nginx config
-COPY deploy/nginx.conf /etc/nginx/http.d/default.conf
+COPY nginx-prod.conf /etc/nginx/http.d/default.conf
 
 # Copy supervisor config
-COPY deploy/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Expose port
 EXPOSE 8080
