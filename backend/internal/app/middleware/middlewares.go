@@ -69,3 +69,23 @@ func Setup(app *fiber.App, cfg *config.Config) {
 		},
 	}))
 }
+
+// StrictRateLimiter returns a rate limiter for sensitive endpoints (registration, etc)
+// Allows only 5 requests per hour per IP
+func StrictRateLimiter() fiber.Handler {
+	return limiter.New(limiter.Config{
+		Max:               5,
+		Expiration:        1 * time.Hour,
+		LimiterMiddleware: limiter.SlidingWindow{},
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return "strict:" + c.IP()
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(ErrorResponse{
+				Success: false,
+				Error:   "Too Many Requests",
+				Message: "Too many attempts. Please try again later.",
+			})
+		},
+	})
+}

@@ -37,9 +37,9 @@ func NewService(userRepo repository.UserRepository, convRepo repository.Conversa
 
 // RegisterRequest represents a registration request
 type RegisterRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Username string `json:"username" validate:"required,min=3,max=100"`
-	Password string `json:"password" validate:"required,min=8"`
+	Email    string `json:"email" validate:"required,email,max=255"`
+	Username string `json:"username" validate:"required,min=3,max=50,alphanum"`
+	Password string `json:"password" validate:"required,min=8,max=128,strongpassword"`
 }
 
 // LoginRequest represents a login request
